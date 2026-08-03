@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mark Attendance - Face Attendance</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav>
+    <div class="brand">Face Attendance</div>
+    <div class="links">
+      <a href="/index.html">Home</a>
+      <a href="/attendance.html" class="active">Mark Attendance</a>
+      <a href="/student.html">Student Panel</a>
+    </div>
+  </nav>
+  <main>
+    <h1>Mark Attendance</h1>
+    <p class="subtitle">Look at the camera. Attendance is marked automatically, only for faces that match a registered user.</p>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <div class="video-wrap">
+          <video id="video" autoplay muted playsinline></video>
+          <canvas id="overlay"></canvas>
+        </div>
+        <p id="recognitionStatus">Loading models...</p>
+      </div>
+
+      <div class="card">
+        <h2>Today's Activity</h2>
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Name</th>
+              <th>Check In</th>
+              <th>Check Out</th>
+            </tr>
+          </thead>
+          <tbody id="activityBody"></tbody>
+        </table>
+        <p id="activityEmpty" class="empty">No activity yet.</p>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/face-api.min.js"></script>
+  <script src="/js/attendance.js"></script>
+</body>
+</html>

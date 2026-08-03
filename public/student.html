@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student Panel - Face Attendance</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav>
+    <div class="brand">Face Attendance</div>
+    <div class="links">
+      <a href="/index.html">Home</a>
+      <a href="/attendance.html">Mark Attendance</a>
+      <a href="/student.html" class="active">Student Panel</a>
+    </div>
+  </nav>
+
+  <main>
+    <h1>Student Panel</h1>
+    <p class="subtitle">Open your own panel with your mobile number or employee ID, then mark only your attendance.</p>
+
+    <div id="lookupSection" class="card" style="max-width: 420px; margin: 40px auto 0;">
+      <h2>Open Your Panel</h2>
+      <label for="identifierInput">Mobile Number or Employee ID</label>
+      <input id="identifierInput" type="text" placeholder="e.g. 9876543210 or EMP001" />
+      <button id="lookupBtn" style="width: 100%;">Open My Panel</button>
+      <p id="lookupError" style="color: var(--bad); margin-top: 10px;"></p>
+    </div>
+
+    <div id="panelSection" style="display: none;">
+      <div class="grid cols-2">
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+            <img id="studentPhoto" class="thumb" style="width: 60px; height: 60px; display: none;" />
+            <div id="studentPhotoPlaceholder" class="thumb thumb-placeholder" style="width: 60px; height: 60px;">?</div>
+            <div>
+              <h2 id="studentName" style="margin: 0;"></h2>
+              <p id="studentId" class="subtitle" style="margin: 2px 0 0;"></p>
+            </div>
+          </div>
+
+          <div class="video-wrap">
+            <video id="video" autoplay muted playsinline></video>
+            <canvas id="overlay"></canvas>
+          </div>
+          <p id="recognitionStatus">Loading models...</p>
+
+          <button id="markBtn" disabled style="width: 100%; margin-top: 12px;">Mark My Attendance</button>
+          <button id="switchUserBtn" class="secondary" style="width: 100%; margin-top: 8px;">Not you? Switch User</button>
+        </div>
+
+        <div class="card">
+          <h2>Today's Status</h2>
+          <div class="grid cols-2">
+            <div class="card stat">
+              <div class="value" id="myCheckIn" style="color: var(--good); font-size: 1.4rem;">-</div>
+              <div class="label">Check In</div>
+            </div>
+            <div class="card stat">
+              <div class="value" id="myCheckOut" style="color: var(--warn); font-size: 1.4rem;">-</div>
+              <div class="label">Check Out</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/face-api.min.js"></script>
+  <script src="/js/student.js"></script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin - Face Attendance</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav>
+    <div class="brand">Face Attendance</div>
+    <div class="links">
+      <a href="/index.html">Home</a>
+      <a href="/attendance.html">Mark Attendance</a>
+      <a href="/student.html">Student Panel</a>
+      <a href="/admin.html" class="active">Admin</a>
+    </div>
+  </nav>
+
+  <main>
+    <div id="loginSection" style="max-width: 380px; margin: 60px auto 0;">
+      <div class="card">
+        <h2>Admin Login</h2>
+        <p class="subtitle" style="margin-bottom: 20px;">Registration, dashboard and reports are only accessible after login.</p>
+        <label for="loginUsername">Username</label>
+        <input id="loginUsername" type="text" autocomplete="username" />
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" />
+        <button id="loginBtn" style="width: 100%;">Login</button>
+        <p id="loginError" style="color: var(--bad); margin-top: 10px;"></p>
+      </div>
+    </div>
+
+    <div id="appSection" style="display: none;">
+      <div class="toolbar" style="justify-content: space-between;">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="registration">Registration</button>
+          <button class="tab-btn" data-tab="dashboard">Dashboard</button>
+          <button class="tab-btn" data-tab="reports">Reports</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span id="loggedInAs" class="subtitle" style="margin:0;"></span>
+          <button id="logoutBtn" class="secondary">Logout</button>
+        </div>
+      </div>
+
+      <!-- Registration -->
+      <section id="tab-registration" class="tab-panel">
+        <div class="grid cols-2">
+          <div class="card">
+            <h2 id="formTitle">Register New Face</h2>
+
+            <div class="video-wrap">
+              <video id="video" autoplay muted playsinline></video>
+              <canvas id="overlay"></canvas>
+              <img id="uploadPreview" style="display:none;" />
+            </div>
+            <p id="modelStatus" class="empty">Loading face recognition models...</p>
+
+            <label for="photoFile">Or upload a photo instead of using the webcam</label>
+            <input id="photoFile" type="file" accept="image/*" />
+            <button id="clearUploadBtn" class="secondary" type="button" style="display:none; margin-bottom: 12px;">
+              Use Webcam Instead
+            </button>
+
+            <label for="name">Full Name</label>
+            <input id="name" type="text" placeholder="e.g. Rahul Sharma" />
+
+            <label for="employeeId">Employee / Roll ID (optional)</label>
+            <input id="employeeId" type="text" placeholder="e.g. EMP001" />
+
+            <label for="phone">Mobile Number (for Student Panel login)</label>
+            <input id="phone" type="tel" placeholder="e.g. 9876543210" />
+
+            <button id="captureBtn" disabled>Capture &amp; Register Face</button>
+            <button id="cancelEditBtn" class="secondary" type="button" style="display:none;">Cancel Edit</button>
+            <p id="captureMsg" style="margin-top: 10px;"></p>
+          </div>
+
+          <div class="card">
+            <h2>Registered Users (<span id="userCount">0</span>)</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>Name</th>
+                  <th>ID</th>
+                  <th>Mobile</th>
+                  <th>Registered</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody"></tbody>
+            </table>
+            <p id="usersEmpty" class="empty" style="display:none;">No users registered yet.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Dashboard -->
+      <section id="tab-dashboard" class="tab-panel" style="display:none;">
+        <div class="grid cols-3" style="margin-bottom: 24px;">
+          <div class="card stat">
+            <div class="value" id="statTotal">-</div>
+            <div class="label">Registered Users</div>
+          </div>
+          <div class="card stat">
+            <div class="value" id="statPresent" style="color: var(--good);">-</div>
+            <div class="label">Present (selected date)</div>
+          </div>
+          <div class="card stat">
+            <div class="value" id="statAbsent" style="color: var(--bad);">-</div>
+            <div class="label">Absent (selected date)</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="toolbar">
+            <h2 style="margin: 0;">Attendance Log</h2>
+            <input type="date" id="datePicker" />
+            <button id="todayBtn" class="secondary">Today</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th>Name</th>
+                <th>Employee ID</th>
+                <th>Check In</th>
+                <th>Check Out</th>
+              </tr>
+            </thead>
+            <tbody id="logBody"></tbody>
+          </table>
+          <p id="logEmpty" class="empty" style="display:none;">No attendance records for this date.</p>
+        </div>
+      </section>
+
+      <!-- Reports -->
+      <section id="tab-reports" class="tab-panel" style="display:none;">
+        <div class="card" style="margin-bottom: 24px;">
+          <div class="toolbar">
+            <div>
+              <label for="rangeSelect">Range</label>
+              <select id="rangeSelect">
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly (last 7 days)</option>
+                <option value="monthly">Monthly (this month)</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div id="customRangeWrap" style="display:none;">
+              <label for="fromDate">From</label>
+              <input type="date" id="fromDate" />
+            </div>
+            <div id="customRangeWrapTo" style="display:none;">
+              <label for="toDate">To</label>
+              <input type="date" id="toDate" />
+            </div>
+            <div id="dailyDateWrap">
+              <label for="dailyDate">Date</label>
+              <input type="date" id="dailyDate" />
+            </div>
+            <div>
+              <label for="userSelect">User</label>
+              <select id="userSelect">
+                <option value="">All Users</option>
+              </select>
+            </div>
+          </div>
+          <div class="toolbar">
+            <button id="generateBtn">Generate Report</button>
+            <button id="downloadBtn" class="secondary">Download Excel</button>
+          </div>
+          <p id="reportRangeLabel" class="subtitle" style="margin: 12px 0 0;"></p>
+        </div>
+
+        <div class="grid cols-2" style="margin-bottom: 24px;">
+          <div class="card">
+            <h2>Summary</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Employee ID</th>
+                  <th>Present</th>
+                  <th>Absent</th>
+                  <th>Attendance %</th>
+                </tr>
+              </thead>
+              <tbody id="summaryBody"></tbody>
+            </table>
+            <p id="summaryEmpty" class="empty" style="display:none;">No data for this range.</p>
+          </div>
+
+          <div class="card">
+            <h2>Daily Log</h2>
+            <div style="max-height: 420px; overflow-y: auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Check In</th>
+                    <th>Check Out</th>
+                  </tr>
+                </thead>
+                <tbody id="dailyBody"></tbody>
+              </table>
+            </div>
+            <p id="dailyEmpty" class="empty" style="display:none;">No data for this range.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/js/face-api.min.js"></script>
+  <script src="/js/admin-app.js"></script>
+</body>
+</html>
