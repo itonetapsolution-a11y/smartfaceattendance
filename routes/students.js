@@ -7,16 +7,17 @@ const router = express.Router();
 
 // Identify a student by mobile number or employee ID (never by browsing a
 // list — no PII beyond their own record is ever returned).
-router.post('/lookup', (req, res) => {
+router.post('/lookup', async (req, res) => {
   const { identifier } = req.body;
   if (!identifier || !identifier.trim()) {
     return res.status(400).json({ error: 'Enter your mobile number or employee ID' });
   }
 
   const id = identifier.trim();
-  const user = db
-    .prepare('SELECT id, name, employee_id, photo FROM users WHERE employee_id = ? OR phone = ?')
-    .get(id, id);
+  const user = await db.get(
+    'SELECT id, name, employee_id, photo FROM users WHERE employee_id = ? OR phone = ?',
+    [id, id]
+  );
 
   if (!user) {
     return res.status(404).json({ error: 'No student found with this mobile number / employee ID' });
@@ -29,16 +30,17 @@ router.post('/lookup', (req, res) => {
 // the ONE user identified by lookup, never matched against everyone else.
 // A mismatch means "this isn't actually you" and nothing gets recorded, so a
 // student can't mark attendance for someone else's ID using their own face.
-router.post('/mark', (req, res) => {
+router.post('/mark', async (req, res) => {
   const { userId, descriptor } = req.body;
 
   if (!userId || !descriptor || !Array.isArray(descriptor)) {
     return res.status(400).json({ error: 'userId and descriptor are required' });
   }
 
-  const user = db
-    .prepare('SELECT id, name, employee_id, photo, descriptor FROM users WHERE id = ?')
-    .get(userId);
+  const user = await db.get(
+    'SELECT id, name, employee_id, photo, descriptor FROM users WHERE id = ?',
+    [userId]
+  );
   if (!user) {
     return res.status(404).json({ error: 'Student not found' });
   }
@@ -50,7 +52,7 @@ router.post('/mark', (req, res) => {
     return res.json({ status: 'face_mismatch' });
   }
 
-  const result = recordSighting(user.id);
+  const result = await recordSighting(user.id);
   res.json({
     status: result.status,
     time: result.time,
@@ -59,11 +61,12 @@ router.post('/mark', (req, res) => {
 });
 
 // Today's own check-in/check-out, for the panel to show after lookup.
-router.get('/status/:userId', (req, res) => {
+router.get('/status/:userId', async (req, res) => {
   const { date } = todayParts();
-  const row = db
-    .prepare('SELECT check_in, check_out FROM attendance WHERE user_id = ? AND date = ?')
-    .get(req.params.userId, date);
+  const row = await db.get(
+    'SELECT check_in, check_out FROM attendance WHERE user_id = ? AND date = ?',
+    [req.params.userId, date]
+  );
   res.json(row || { check_in: null, check_out: null });
 });
 

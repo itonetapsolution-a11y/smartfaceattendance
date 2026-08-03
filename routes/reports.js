@@ -43,19 +43,21 @@ function dateRangeList(from, to) {
 }
 
 // Builds the { summary, daily, from, to } report shape shared by the JSON and Excel endpoints.
-function buildReport({ range, from: fromQ, to: toQ, userId }) {
+async function buildReport({ range, from: fromQ, to: toQ, userId }) {
   const { from, to } = resolveRange(range, fromQ, toQ);
   const dates = dateRangeList(from, to);
 
   const users = userId
-    ? db.prepare('SELECT id, name, employee_id FROM users WHERE id = ?').all(userId)
-    : db.prepare('SELECT id, name, employee_id FROM users ORDER BY name ASC').all();
+    ? await db.all('SELECT id, name, employee_id FROM users WHERE id = ?', [userId])
+    : await db.all('SELECT id, name, employee_id FROM users ORDER BY name ASC');
 
   const attendanceRows = userId
-    ? db
-        .prepare('SELECT * FROM attendance WHERE user_id = ? AND date BETWEEN ? AND ?')
-        .all(userId, from, to)
-    : db.prepare('SELECT * FROM attendance WHERE date BETWEEN ? AND ?').all(from, to);
+    ? await db.all('SELECT * FROM attendance WHERE user_id = ? AND date BETWEEN ? AND ?', [
+        userId,
+        from,
+        to,
+      ])
+    : await db.all('SELECT * FROM attendance WHERE date BETWEEN ? AND ?', [from, to]);
 
   const byUserDate = new Map();
   for (const row of attendanceRows) {
@@ -102,14 +104,14 @@ function buildReport({ range, from: fromQ, to: toQ, userId }) {
   return { from, to, summary, daily };
 }
 
-router.get('/data', (req, res) => {
+router.get('/data', async (req, res) => {
   const { range = 'daily', from, to, userId } = req.query;
-  res.json(buildReport({ range, from, to, userId }));
+  res.json(await buildReport({ range, from, to, userId }));
 });
 
 router.get('/export', async (req, res) => {
   const { range = 'daily', from, to, userId } = req.query;
-  const report = buildReport({ range, from, to, userId });
+  const report = await buildReport({ range, from, to, userId });
 
   const workbook = new ExcelJS.Workbook();
 
