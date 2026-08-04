@@ -235,6 +235,41 @@ myFromDate.value = todayStr();
 myToDate.value = todayStr();
 updateMyRangeVisibility();
 
+/* ------------------------------- Session -------------------------------- */
+// The panel stays open across page reloads until the student explicitly
+// logs out — nobody wants to look up their ID again just from a refresh.
+
+const STORAGE_KEY = 'studentSession';
+
+async function openPanel(studentData) {
+  student = studentData;
+  studentName.textContent = student.name;
+  studentId.textContent = student.employeeId ? `ID: ${student.employeeId}` : '';
+  if (student.photo) {
+    studentPhoto.src = student.photo;
+    studentPhoto.style.display = 'block';
+    studentPhotoPlaceholder.style.display = 'none';
+  } else {
+    studentPhoto.style.display = 'none';
+    studentPhotoPlaceholder.style.display = 'flex';
+  }
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(student));
+
+  lookupSection.style.display = 'none';
+  panelSection.style.display = 'block';
+
+  // These don't need the camera, so they load even if it fails to start.
+  loadTodayStatus();
+  loadMyReport();
+
+  try {
+    await ensureCameraReady();
+  } catch (err) {
+    setStatus('Camera unavailable. You can still view your attendance below.', 'bad');
+  }
+}
+
 lookupBtn.addEventListener('click', async () => {
   const identifier = identifierInput.value.trim();
   lookupError.textContent = '';
@@ -257,30 +292,7 @@ lookupBtn.addEventListener('click', async () => {
     return;
   }
 
-  student = data;
-  studentName.textContent = student.name;
-  studentId.textContent = student.employeeId ? `ID: ${student.employeeId}` : '';
-  if (student.photo) {
-    studentPhoto.src = student.photo;
-    studentPhoto.style.display = 'block';
-    studentPhotoPlaceholder.style.display = 'none';
-  } else {
-    studentPhoto.style.display = 'none';
-    studentPhotoPlaceholder.style.display = 'flex';
-  }
-
-  lookupSection.style.display = 'none';
-  panelSection.style.display = 'block';
-
-  // These don't need the camera, so they load even if it fails to start.
-  loadTodayStatus();
-  loadMyReport();
-
-  try {
-    await ensureCameraReady();
-  } catch (err) {
-    setStatus('Camera unavailable. You can still view your attendance below.', 'bad');
-  }
+  openPanel(data);
 });
 
 identifierInput.addEventListener('keydown', (e) => {
@@ -348,7 +360,18 @@ switchUserBtn.addEventListener('click', () => {
   student = null;
   identifierInput.value = '';
   lookupError.textContent = '';
+  localStorage.removeItem(STORAGE_KEY);
   panelSection.style.display = 'none';
   lookupSection.style.display = 'block';
   markBtn.disabled = true;
 });
+
+// Restore an already-open panel on page load/refresh.
+const savedSession = localStorage.getItem(STORAGE_KEY);
+if (savedSession) {
+  try {
+    openPanel(JSON.parse(savedSession));
+  } catch (err) {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+}
