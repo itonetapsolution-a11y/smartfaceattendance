@@ -52,31 +52,47 @@
           <div class="card">
             <h2 id="formTitle">Register New Face</h2>
 
-            <div class="video-wrap">
-              <video id="video" autoplay muted playsinline></video>
-              <canvas id="overlay"></canvas>
-              <img id="uploadPreview" style="display:none;" />
+            <div class="toolbar" style="margin-bottom: 20px;">
+              <span id="stepLabel1" style="font-weight: 700;">① Details</span>
+              <span style="color: var(--text-dim);">&rarr;</span>
+              <span id="stepLabel2" style="color: var(--text-dim);">② Photo</span>
             </div>
-            <p id="modelStatus" class="empty">Loading face recognition models...</p>
 
-            <label for="photoFile">Or upload a photo instead of using the webcam</label>
-            <input id="photoFile" type="file" accept="image/*" />
-            <button id="clearUploadBtn" class="secondary" type="button" style="display:none; margin-bottom: 12px;">
-              Use Webcam Instead
-            </button>
+            <!-- Step 1: details -->
+            <div id="regStep1">
+              <label for="name">Full Name</label>
+              <input id="name" type="text" placeholder="e.g. Rahul Sharma" />
 
-            <label for="name">Full Name</label>
-            <input id="name" type="text" placeholder="e.g. Rahul Sharma" />
+              <label for="employeeId">Employee / Roll ID (optional)</label>
+              <input id="employeeId" type="text" placeholder="e.g. EMP001" />
 
-            <label for="employeeId">Employee / Roll ID (optional)</label>
-            <input id="employeeId" type="text" placeholder="e.g. EMP001" />
+              <label for="phone">Mobile Number (for Student Panel login)</label>
+              <input id="phone" type="tel" placeholder="e.g. 9876543210" />
 
-            <label for="phone">Mobile Number (for Student Panel login)</label>
-            <input id="phone" type="tel" placeholder="e.g. 9876543210" />
+              <button id="nextStepBtn" style="width: 100%;">Next: Add Photo &rarr;</button>
+              <button id="cancelEditBtn" class="secondary" type="button" style="display:none; width: 100%; margin-top: 8px;">Cancel Edit</button>
+              <p id="step1Msg" style="margin-top: 10px;"></p>
+            </div>
 
-            <button id="captureBtn" disabled>Capture &amp; Register Face</button>
-            <button id="cancelEditBtn" class="secondary" type="button" style="display:none;">Cancel Edit</button>
-            <p id="captureMsg" style="margin-top: 10px;"></p>
+            <!-- Step 2: photo -->
+            <div id="regStep2" style="display:none;">
+              <div class="video-wrap">
+                <video id="video" autoplay muted playsinline></video>
+                <canvas id="overlay"></canvas>
+                <img id="uploadPreview" style="display:none;" />
+              </div>
+              <p id="modelStatus" class="empty">Loading face recognition models...</p>
+
+              <label for="photoFile">Or upload a photo instead of using the webcam</label>
+              <input id="photoFile" type="file" accept="image/*" />
+              <button id="clearUploadBtn" class="secondary" type="button" style="display:none; margin-bottom: 12px;">
+                Use Webcam Instead
+              </button>
+
+              <button id="captureBtn" disabled>Capture &amp; Register Face</button>
+              <button id="backStepBtn" class="secondary" type="button" style="width: 100%; margin-top: 8px;">&larr; Back to Details</button>
+              <p id="captureMsg" style="margin-top: 10px;"></p>
+            </div>
           </div>
 
           <div class="card">

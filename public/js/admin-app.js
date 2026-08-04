@@ -116,6 +116,33 @@ const usersTableBody = document.getElementById('usersTableBody');
 const usersEmpty = document.getElementById('usersEmpty');
 const userCount = document.getElementById('userCount');
 
+const regStep1 = document.getElementById('regStep1');
+const regStep2 = document.getElementById('regStep2');
+const stepLabel1 = document.getElementById('stepLabel1');
+const stepLabel2 = document.getElementById('stepLabel2');
+const nextStepBtn = document.getElementById('nextStepBtn');
+const backStepBtn = document.getElementById('backStepBtn');
+const step1Msg = document.getElementById('step1Msg');
+
+function goToStep(step) {
+  regStep1.style.display = step === 1 ? 'block' : 'none';
+  regStep2.style.display = step === 2 ? 'block' : 'none';
+  stepLabel1.style.color = step === 1 ? 'var(--text)' : 'var(--text-dim)';
+  stepLabel2.style.color = step === 2 ? 'var(--text)' : 'var(--text-dim)';
+}
+
+nextStepBtn.addEventListener('click', () => {
+  if (!nameInput.value.trim()) {
+    step1Msg.textContent = 'Please enter a name first.';
+    step1Msg.style.color = 'var(--bad)';
+    return;
+  }
+  step1Msg.textContent = '';
+  goToStep(2);
+});
+
+backStepBtn.addEventListener('click', () => goToStep(1));
+
 const detectorOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
 
 let isUploadMode = false;
@@ -168,6 +195,7 @@ function drawBoxLoop() {
 }
 
 async function initRegistration() {
+  goToStep(1);
   await startCamera();
   await loadModels();
   modelStatus.textContent = 'Ready. Position your face in the frame and click Capture, or upload a photo instead.';
@@ -216,8 +244,10 @@ function enterEditMode(user) {
   formTitle.textContent = `Edit User: ${user.name}`;
   captureBtn.textContent = 'Save Changes';
   cancelEditBtn.style.display = 'inline-block';
-  captureMsg.textContent = 'Change the name/ID and click Save. To also update the face, capture from webcam or upload a new photo first.';
+  captureMsg.textContent = 'To also update the face, capture from webcam or upload a new photo. Otherwise just click Save Changes.';
   captureMsg.style.color = 'var(--text-dim)';
+  step1Msg.textContent = '';
+  goToStep(1);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -230,7 +260,9 @@ function exitEditMode() {
   captureBtn.textContent = 'Capture & Register Face';
   cancelEditBtn.style.display = 'none';
   captureMsg.textContent = '';
+  step1Msg.textContent = '';
   switchToWebcamMode();
+  goToStep(1);
 }
 
 cancelEditBtn.addEventListener('click', exitEditMode);
