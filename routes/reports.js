@@ -6,8 +6,11 @@ const { requireAuth } = require('./auth');
 const router = express.Router();
 router.use(requireAuth);
 
+// Fixed to IST regardless of the server's own timezone (e.g. Vercel runs in UTC).
+const TIMEZONE = 'Asia/Kolkata';
+
 function toDateStr(d) {
-  return d.toLocaleDateString('en-CA'); // YYYY-MM-DD
+  return d.toLocaleDateString('en-CA', { timeZone: TIMEZONE }); // YYYY-MM-DD
 }
 
 // Turns a range preset (or explicit from/to for "custom") into a concrete date span.
