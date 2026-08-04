@@ -2,6 +2,7 @@ const express = require('express');
 const ExcelJS = require('exceljs');
 const db = require('../db/database');
 const { requireAuth } = require('./auth');
+const { syncReportToSheet } = require('../lib/googleSheets');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -153,6 +154,17 @@ router.get('/export', async (req, res) => {
 
   await workbook.xlsx.write(res);
   res.end();
+});
+
+router.post('/sync-sheets', async (req, res) => {
+  const { range = 'daily', from, to, userId } = req.query;
+  try {
+    const report = await buildReport({ range, from, to, userId });
+    const url = await syncReportToSheet(report);
+    res.json({ success: true, url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

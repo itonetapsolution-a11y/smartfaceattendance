@@ -394,6 +394,8 @@ const toDate = document.getElementById('toDate');
 const userSelect = document.getElementById('userSelect');
 const generateBtn = document.getElementById('generateBtn');
 const downloadBtn = document.getElementById('downloadBtn');
+const syncSheetsBtn = document.getElementById('syncSheetsBtn');
+const syncStatus = document.getElementById('syncStatus');
 const reportRangeLabel = document.getElementById('reportRangeLabel');
 const summaryBody = document.getElementById('summaryBody');
 const summaryEmpty = document.getElementById('summaryEmpty');
@@ -473,6 +475,30 @@ generateBtn.addEventListener('click', generateReport);
 downloadBtn.addEventListener('click', () => {
   const params = buildReportQuery();
   window.location.href = `/api/reports/export?${params.toString()}`;
+});
+
+syncSheetsBtn.addEventListener('click', async () => {
+  const params = buildReportQuery();
+  syncSheetsBtn.disabled = true;
+  syncStatus.textContent = 'Syncing to Google Sheets...';
+  syncStatus.style.color = 'var(--text-dim)';
+
+  try {
+    const res = await fetch(`/api/reports/sync-sheets?${params.toString()}`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      syncStatus.innerHTML = `Synced. <a href="${data.url}" target="_blank" rel="noopener">Open Sheet</a>`;
+      syncStatus.style.color = 'var(--good)';
+    } else {
+      syncStatus.textContent = data.error || 'Sync failed.';
+      syncStatus.style.color = 'var(--bad)';
+    }
+  } catch (err) {
+    syncStatus.textContent = 'Sync failed.';
+    syncStatus.style.color = 'var(--bad)';
+  }
+
+  syncSheetsBtn.disabled = false;
 });
 
 dailyDate.value = todayStr();
