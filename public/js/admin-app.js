@@ -12,6 +12,9 @@ function statusBadgeClass(status) {
   if (status === 'Present') return 'status-good';
   if (status === 'Late') return 'status-warn';
   if (status === 'Half Day') return 'status-half';
+  if (status === 'Holiday') return 'status-holiday';
+  if (status === 'Paid Leave') return 'status-paid';
+  if (status === 'Optional Leave') return 'status-optional';
   return 'status-bad'; // Absent
 }
 
@@ -106,6 +109,9 @@ function activateTab(tab) {
   } else if (tab === 'settings') {
     loadGeofence();
     loadAttendanceRules();
+    loadHolidays();
+    loadLeaveUserOptions();
+    loadLeaves();
   }
 }
 
@@ -744,6 +750,9 @@ async function generateReport() {
       <td>${row.presentDays}</td>
       <td>${row.lateDays}</td>
       <td>${row.halfDays}</td>
+      <td>${row.holidayDays}</td>
+      <td>${row.paidLeaveDays}</td>
+      <td>${row.optionalLeaveDays}</td>
       <td>${row.absentDays}</td>
       <td>${row.attendancePct}%</td>
     `;
@@ -1036,6 +1045,151 @@ saveRulesBtn.addEventListener('click', async () => {
   }
 
   saveRulesBtn.disabled = false;
+});
+
+/* ------------------------------- Holidays ------------------------------- */
+
+const holidayDate = document.getElementById('holidayDate');
+const holidayName = document.getElementById('holidayName');
+const addHolidayBtn = document.getElementById('addHolidayBtn');
+const holidayMsg = document.getElementById('holidayMsg');
+const holidaysBody = document.getElementById('holidaysBody');
+const holidaysEmpty = document.getElementById('holidaysEmpty');
+
+async function loadHolidays() {
+  const res = await fetch('/api/settings/holidays');
+  const holidays = await res.json();
+
+  holidaysBody.innerHTML = '';
+  holidaysEmpty.style.display = holidays.length ? 'none' : 'block';
+
+  for (const h of holidays) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${h.date}</td>
+      <td>${escapeHtml(h.name)}</td>
+      <td class="row-actions"><button class="danger" type="button">Delete</button></td>
+    `;
+    tr.querySelector('button').addEventListener('click', async () => {
+      if (!confirm(`Remove holiday "${h.name}" on ${h.date}?`)) return;
+      await fetch(`/api/settings/holidays/${h.id}`, { method: 'DELETE' });
+      loadHolidays();
+    });
+    holidaysBody.appendChild(tr);
+  }
+}
+
+addHolidayBtn.addEventListener('click', async () => {
+  if (!holidayDate.value || !holidayName.value.trim()) {
+    holidayMsg.textContent = 'Pick a date and enter a name.';
+    holidayMsg.style.color = 'var(--bad)';
+    return;
+  }
+
+  addHolidayBtn.disabled = true;
+  const res = await fetch('/api/settings/holidays', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date: holidayDate.value, name: holidayName.value.trim() }),
+  });
+  const data = await res.json();
+
+  if (res.ok) {
+    holidayMsg.textContent = 'Holiday added.';
+    holidayMsg.style.color = 'var(--good)';
+    holidayDate.value = '';
+    holidayName.value = '';
+    loadHolidays();
+  } else {
+    holidayMsg.textContent = data.error || 'Failed to add holiday.';
+    holidayMsg.style.color = 'var(--bad)';
+  }
+  addHolidayBtn.disabled = false;
+});
+
+/* --------------------------------- Leaves -------------------------------- */
+
+const leaveUser = document.getElementById('leaveUser');
+const leaveDate = document.getElementById('leaveDate');
+const leaveType = document.getElementById('leaveType');
+const leaveReason = document.getElementById('leaveReason');
+const addLeaveBtn = document.getElementById('addLeaveBtn');
+const leaveMsg = document.getElementById('leaveMsg');
+const leavesBody = document.getElementById('leavesBody');
+const leavesEmpty = document.getElementById('leavesEmpty');
+
+let leaveUsersLoadedOnce = false;
+async function loadLeaveUserOptions() {
+  if (leaveUsersLoadedOnce) return;
+  leaveUsersLoadedOnce = true;
+  const res = await fetch('/api/users');
+  const users = await res.json();
+  leaveUser.innerHTML = '';
+  for (const u of users) {
+    const opt = document.createElement('option');
+    opt.value = u.id;
+    opt.textContent = u.name;
+    leaveUser.appendChild(opt);
+  }
+}
+
+async function loadLeaves() {
+  const res = await fetch('/api/settings/leaves');
+  const leaves = await res.json();
+
+  leavesBody.innerHTML = '';
+  leavesEmpty.style.display = leaves.length ? 'none' : 'block';
+
+  for (const l of leaves) {
+    const tr = document.createElement('tr');
+    const typeLabel = l.type === 'paid' ? 'Paid Leave' : 'Optional Leave';
+    const badgeClass = l.type === 'paid' ? 'status-paid' : 'status-optional';
+    tr.innerHTML = `
+      <td>${l.date}</td>
+      <td>${escapeHtml(l.name)}</td>
+      <td><span class="status-badge ${badgeClass}">${typeLabel}</span></td>
+      <td class="row-actions"><button class="danger" type="button">Delete</button></td>
+    `;
+    tr.querySelector('button').addEventListener('click', async () => {
+      if (!confirm(`Remove this leave for ${l.name} on ${l.date}?`)) return;
+      await fetch(`/api/settings/leaves/${l.id}`, { method: 'DELETE' });
+      loadLeaves();
+    });
+    leavesBody.appendChild(tr);
+  }
+}
+
+addLeaveBtn.addEventListener('click', async () => {
+  if (!leaveUser.value || !leaveDate.value) {
+    leaveMsg.textContent = 'Pick a user and a date.';
+    leaveMsg.style.color = 'var(--bad)';
+    return;
+  }
+
+  addLeaveBtn.disabled = true;
+  const res = await fetch('/api/settings/leaves', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userId: leaveUser.value,
+      date: leaveDate.value,
+      type: leaveType.value,
+      reason: leaveReason.value.trim(),
+    }),
+  });
+  const data = await res.json();
+
+  if (res.ok) {
+    leaveMsg.textContent = 'Leave granted.';
+    leaveMsg.style.color = 'var(--good)';
+    leaveDate.value = '';
+    leaveReason.value = '';
+    loadLeaves();
+  } else {
+    leaveMsg.textContent = data.error || 'Failed to grant leave.';
+    leaveMsg.style.color = 'var(--bad)';
+  }
+  addLeaveBtn.disabled = false;
 });
 
 /* -------------------------------- Start -------------------------------- */

@@ -418,6 +418,24 @@ tbody tr:hover {
   box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.25);
 }
 
+.status-holiday {
+  background: rgba(236, 72, 153, 0.15);
+  color: var(--accent-3);
+  box-shadow: inset 0 0 0 1px rgba(236, 72, 153, 0.25);
+}
+
+.status-paid {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.25);
+}
+
+.status-optional {
+  background: rgba(167, 139, 250, 0.15);
+  color: #a78bfa;
+  box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.25);
+}
+
 #recognitionStatus {
   text-align: center;
   margin-top: 16px;

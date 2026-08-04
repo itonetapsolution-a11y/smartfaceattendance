@@ -3,7 +3,12 @@ const ExcelJS = require('exceljs');
 const db = require('../db/database');
 const { requireAuth } = require('./auth');
 const { syncReportToSheet } = require('../lib/googleSheets');
-const { getAttendanceRules, computeStatus } = require('../lib/attendanceStatus');
+const {
+  getAttendanceRules,
+  computeStatus,
+  getHolidaysInRange,
+  getLeavesInRange,
+} = require('../lib/attendanceStatus');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -70,15 +75,30 @@ async function buildReport({ range, from: fromQ, to: toQ, userId }) {
   }
 
   const rules = await getAttendanceRules();
+  const holidays = await getHolidaysInRange(from, to);
+  const leaves = await getLeavesInRange(from, to);
+
   const daily = [];
-  const statusCounts = new Map(); // userId -> { Present, Late, 'Half Day' }
+  const emptyCounts = () => ({
+    Present: 0,
+    Late: 0,
+    'Half Day': 0,
+    Holiday: 0,
+    'Paid Leave': 0,
+    'Optional Leave': 0,
+  });
+  const statusCounts = new Map(); // userId -> counts
 
   for (const date of dates) {
+    const isHoliday = holidays.has(date);
     for (const u of users) {
       const row = byUserDate.get(`${u.id}_${date}`);
-      const status = computeStatus(row, rules);
+      const status = computeStatus(row, rules, {
+        isHoliday,
+        leaveType: leaves.get(`${u.id}_${date}`),
+      });
       if (status !== 'Absent') {
-        const counts = statusCounts.get(u.id) || { Present: 0, Late: 0, 'Half Day': 0 };
+        const counts = statusCounts.get(u.id) || emptyCounts();
         counts[status]++;
         statusCounts.set(u.id, counts);
       }
@@ -96,10 +116,16 @@ async function buildReport({ range, from: fromQ, to: toQ, userId }) {
   }
 
   const totalDays = dates.length;
+  const holidayDays = dates.filter((d) => holidays.has(d)).length;
+  const workingDays = totalDays - holidayDays;
+
   const summary = users.map((u) => {
-    const counts = statusCounts.get(u.id) || { Present: 0, Late: 0, 'Half Day': 0 };
-    const attendedDays = counts.Present + counts.Late + counts['Half Day'];
-    const absentDays = totalDays - attendedDays;
+    const counts = statusCounts.get(u.id) || emptyCounts();
+    // Excludes Holiday on purpose — holidays aren't working days, so they're
+    // removed from the denominator (workingDays) instead of counted here.
+    const accountedDays =
+      counts.Present + counts.Late + counts['Half Day'] + counts['Paid Leave'] + counts['Optional Leave'];
+    const absentDays = workingDays - accountedDays;
     return {
       userId: u.id,
       name: u.name,
@@ -108,8 +134,11 @@ async function buildReport({ range, from: fromQ, to: toQ, userId }) {
       presentDays: counts.Present,
       lateDays: counts.Late,
       halfDays: counts['Half Day'],
-      absentDays,
-      attendancePct: totalDays ? Math.round((attendedDays / totalDays) * 100) : 0,
+      holidayDays: counts.Holiday,
+      paidLeaveDays: counts['Paid Leave'],
+      optionalLeaveDays: counts['Optional Leave'],
+      absentDays: Math.max(absentDays, 0),
+      attendancePct: workingDays ? Math.round((accountedDays / workingDays) * 100) : 0,
     };
   });
 
@@ -135,6 +164,9 @@ router.get('/export', async (req, res) => {
     { header: 'Present', key: 'presentDays', width: 10 },
     { header: 'Late', key: 'lateDays', width: 10 },
     { header: 'Half Day', key: 'halfDays', width: 10 },
+    { header: 'Holiday', key: 'holidayDays', width: 10 },
+    { header: 'Paid Leave', key: 'paidLeaveDays', width: 12 },
+    { header: 'Optional Leave', key: 'optionalLeaveDays', width: 14 },
     { header: 'Absent', key: 'absentDays', width: 10 },
     { header: 'Attendance %', key: 'attendancePct', width: 14 },
   ];

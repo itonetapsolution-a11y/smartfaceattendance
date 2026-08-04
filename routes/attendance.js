@@ -4,7 +4,12 @@ const { requireAuth } = require('./auth');
 const { MATCH_THRESHOLD, euclideanDistance } = require('../lib/faceMatch');
 const { todayParts, recordSighting } = require('../lib/attendanceCore');
 const { checkWithinGeofence } = require('../lib/geofence');
-const { getAttendanceRules, computeStatus } = require('../lib/attendanceStatus');
+const {
+  getAttendanceRules,
+  computeStatus,
+  getHolidaysInRange,
+  getLeavesInRange,
+} = require('../lib/attendanceStatus');
 
 const router = express.Router();
 
@@ -68,30 +73,61 @@ router.get('/', async (req, res) => {
     [date]
   );
   const rules = await getAttendanceRules();
-  res.json(rows.map((row) => ({ ...row, status: computeStatus(row, rules) })));
+  const holidays = await getHolidaysInRange(date, date);
+  const leaves = await getLeavesInRange(date, date);
+  const isHoliday = holidays.has(date);
+
+  res.json(
+    rows.map((row) => ({
+      ...row,
+      status: computeStatus(row, rules, {
+        isHoliday,
+        leaveType: leaves.get(`${row.user_id}_${row.date}`),
+      }),
+    }))
+  );
 });
 
-// Quick stats for the dashboard: Present / Late / Half Day / Absent breakdown
+// Quick stats for the dashboard: full breakdown across every registered user
 router.get('/stats', requireAuth, async (req, res) => {
   const date = req.query.date || todayParts().date;
-  const totalRegistered = (await db.get('SELECT COUNT(*) as c FROM users')).c;
-  const rows = await db.all('SELECT check_in, check_out FROM attendance WHERE date = ?', [date]);
+  const users = await db.all('SELECT id FROM users');
+  const attendanceRows = await db.all('SELECT user_id, check_in, check_out FROM attendance WHERE date = ?', [
+    date,
+  ]);
+  const attByUser = new Map(attendanceRows.map((r) => [r.user_id, r]));
   const rules = await getAttendanceRules();
+  const holidays = await getHolidaysInRange(date, date);
+  const leaves = await getLeavesInRange(date, date);
+  const isHoliday = holidays.has(date);
 
-  const counts = { Present: 0, Late: 0, 'Half Day': 0 };
-  for (const row of rows) {
-    const status = computeStatus(row, rules);
-    if (counts[status] !== undefined) counts[status]++;
+  const counts = {
+    Present: 0,
+    Late: 0,
+    'Half Day': 0,
+    Absent: 0,
+    Holiday: 0,
+    'Paid Leave': 0,
+    'Optional Leave': 0,
+  };
+  for (const u of users) {
+    const status = computeStatus(attByUser.get(u.id), rules, {
+      isHoliday,
+      leaveType: leaves.get(`${u.id}_${date}`),
+    });
+    counts[status] = (counts[status] || 0) + 1;
   }
-  const attendedToday = rows.length;
 
   res.json({
     date,
-    totalRegistered,
+    totalRegistered: users.length,
     presentToday: counts.Present,
     lateToday: counts.Late,
     halfDayToday: counts['Half Day'],
-    absentToday: totalRegistered - attendedToday,
+    absentToday: counts.Absent,
+    holidayToday: counts.Holiday,
+    paidLeaveToday: counts['Paid Leave'],
+    optionalLeaveToday: counts['Optional Leave'],
   });
 });
 

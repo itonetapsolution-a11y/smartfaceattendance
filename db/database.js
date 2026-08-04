@@ -71,6 +71,29 @@ async function migrate() {
     )
   `);
 
+  // Company-wide holidays — apply automatically to every user on that date.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS holidays (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL
+    )
+  `);
+
+  // Per-user leave grants (optional or paid), one per user per date.
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS leaves (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      type TEXT NOT NULL CHECK (type IN ('optional', 'paid')),
+      reason TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(user_id, date)
+    )
+  `);
+
   const userColumns = (await all('PRAGMA table_info(users)')).map((c) => c.name);
   if (!userColumns.includes('photo')) {
     await client.execute('ALTER TABLE users ADD COLUMN photo TEXT');
