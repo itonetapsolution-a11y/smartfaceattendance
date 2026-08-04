@@ -3,6 +3,7 @@ const db = require('../db/database');
 const { requireAuth } = require('./auth');
 const { MATCH_THRESHOLD, euclideanDistance } = require('../lib/faceMatch');
 const { todayParts, recordSighting } = require('../lib/attendanceCore');
+const { checkWithinGeofence } = require('../lib/geofence');
 
 const router = express.Router();
 
@@ -11,10 +12,18 @@ const router = express.Router();
 // ever gets an attendance row. For the 1:1 verified flow (student enters
 // their ID first), see routes/students.js.
 router.post('/mark', async (req, res) => {
-  const { descriptor } = req.body;
+  const { descriptor, latitude, longitude } = req.body;
 
   if (!descriptor || !Array.isArray(descriptor)) {
     return res.status(400).json({ error: 'descriptor is required' });
+  }
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+    return res.status(400).json({ error: 'location is required' });
+  }
+
+  const geo = await checkWithinGeofence(latitude, longitude);
+  if (!geo.withinRange) {
+    return res.json({ status: 'outside_geofence', distance: Math.round(geo.distance) });
   }
 
   const users = await db.all('SELECT id, name, employee_id, descriptor FROM users');

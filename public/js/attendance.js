@@ -10,6 +10,29 @@ let faceMatcher = null;
 let lastMarkAttempt = 0;
 const MARK_COOLDOWN_MS = 2500;
 
+// Attendance can only be marked near the configured location (see Admin ->
+// Settings). watchPosition keeps this fresh instead of a one-off read.
+let currentPosition = null;
+let locationError = null;
+
+function startLocationWatch() {
+  if (!('geolocation' in navigator)) {
+    locationError = 'Geolocation is not supported by this browser.';
+    return;
+  }
+  navigator.geolocation.watchPosition(
+    (pos) => {
+      currentPosition = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+      locationError = null;
+    },
+    () => {
+      currentPosition = null;
+      locationError = 'Location permission is required to mark attendance.';
+    },
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
+}
+
 let lastSpokenLabel = null;
 let lastSpokenTime = 0;
 const SPEAK_REPEAT_COOLDOWN_MS = 8000;
@@ -167,6 +190,11 @@ async function detectLoop() {
       return;
     }
 
+    if (!currentPosition) {
+      setStatus(locationError || 'Getting your location...', 'warn');
+      return;
+    }
+
     setStatus('Face recognized. Verifying attendance...', 'dim');
 
     const now = Date.now();
@@ -176,7 +204,11 @@ async function detectLoop() {
     const res = await fetch('/api/attendance/mark', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ descriptor: Array.from(detection.descriptor) }),
+      body: JSON.stringify({
+        descriptor: Array.from(detection.descriptor),
+        latitude: currentPosition.latitude,
+        longitude: currentPosition.longitude,
+      }),
     });
     const data = await res.json();
 
@@ -188,6 +220,9 @@ async function detectLoop() {
       setStatus(`ℹ️ ${data.user.name}, checked out updated at ${data.time}.`, 'warn');
       setCheckOut(data.user.id, data.user.name, data.user.photo, 'earlier today', data.time);
       speakForLabel(label, `${data.user.name}, checked out.`);
+    } else if (data.status === 'outside_geofence') {
+      setStatus(`❌ You are ${data.distance}m away from the allowed location. Move closer to mark attendance.`, 'bad');
+      speakForLabel(label, 'You are too far from the location. Attendance not marked.');
     } else {
       setStatus('Face not recognized — not a registered user.', 'bad');
     }
@@ -195,6 +230,7 @@ async function detectLoop() {
 }
 
 async function init() {
+  startLocationWatch();
   await startCamera();
   await Promise.all([loadModels(), buildFaceMatcher(), loadTodayActivity()]);
   setStatus('Ready. Look at the camera.', 'dim');

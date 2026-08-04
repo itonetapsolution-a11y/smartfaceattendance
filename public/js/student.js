@@ -23,6 +23,28 @@ let student = null;
 let cameraStarted = false;
 let mediaStream = null;
 
+// Attendance can only be marked near the configured location.
+let currentPosition = null;
+let locationError = null;
+
+function startLocationWatch() {
+  if (!('geolocation' in navigator)) {
+    locationError = 'Geolocation is not supported by this browser.';
+    return;
+  }
+  navigator.geolocation.watchPosition(
+    (pos) => {
+      currentPosition = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+      locationError = null;
+    },
+    () => {
+      currentPosition = null;
+      locationError = 'Location permission is required to mark attendance.';
+    },
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
+}
+
 function speak(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -77,6 +99,7 @@ function drawBoxLoop() {
 
 async function ensureCameraReady() {
   if (cameraStarted) return;
+  startLocationWatch();
   await startCamera();
   await loadModels();
   cameraStarted = true;
@@ -152,10 +175,21 @@ markBtn.addEventListener('click', async () => {
     return;
   }
 
+  if (!currentPosition) {
+    setStatus(locationError || 'Getting your location...', 'warn');
+    markBtn.disabled = false;
+    return;
+  }
+
   const res = await fetch('/api/students/mark', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: student.id, descriptor: Array.from(detection.descriptor) }),
+    body: JSON.stringify({
+      userId: student.id,
+      descriptor: Array.from(detection.descriptor),
+      latitude: currentPosition.latitude,
+      longitude: currentPosition.longitude,
+    }),
   });
   const data = await res.json();
 
@@ -170,6 +204,9 @@ markBtn.addEventListener('click', async () => {
   } else if (data.status === 'face_mismatch') {
     setStatus('❌ This face does not match this ID. Attendance not marked.', 'bad');
     speak('Face does not match this ID. Attendance not marked.');
+  } else if (data.status === 'outside_geofence') {
+    setStatus(`❌ You are ${data.distance}m away from the allowed location. Move closer to mark attendance.`, 'bad');
+    speak('You are too far from the location. Attendance not marked.');
   } else {
     setStatus(data.error || 'Something went wrong.', 'bad');
   }

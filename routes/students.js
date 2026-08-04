@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db/database');
 const { MATCH_THRESHOLD, euclideanDistance } = require('../lib/faceMatch');
 const { todayParts, recordSighting } = require('../lib/attendanceCore');
+const { checkWithinGeofence } = require('../lib/geofence');
 
 const router = express.Router();
 
@@ -31,10 +32,18 @@ router.post('/lookup', async (req, res) => {
 // A mismatch means "this isn't actually you" and nothing gets recorded, so a
 // student can't mark attendance for someone else's ID using their own face.
 router.post('/mark', async (req, res) => {
-  const { userId, descriptor } = req.body;
+  const { userId, descriptor, latitude, longitude } = req.body;
 
   if (!userId || !descriptor || !Array.isArray(descriptor)) {
     return res.status(400).json({ error: 'userId and descriptor are required' });
+  }
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+    return res.status(400).json({ error: 'location is required' });
+  }
+
+  const geo = await checkWithinGeofence(latitude, longitude);
+  if (!geo.withinRange) {
+    return res.json({ status: 'outside_geofence', distance: Math.round(geo.distance) });
   }
 
   const user = await db.get(

@@ -64,6 +64,13 @@ async function migrate() {
     )
   `);
 
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `);
+
   const userColumns = (await all('PRAGMA table_info(users)')).map((c) => c.name);
   if (!userColumns.includes('photo')) {
     await client.execute('ALTER TABLE users ADD COLUMN photo TEXT');
@@ -80,6 +87,18 @@ async function migrate() {
       defaultHash,
     ]);
     console.log('Created default admin account -> username: admin, password: admin123');
+  }
+
+  const geoDefaults = {
+    geofence_lat: '25.133278058574543',
+    geofence_lng: '75.82304254920568',
+    geofence_radius_m: '200',
+  };
+  for (const [key, value] of Object.entries(geoDefaults)) {
+    const existing = await get('SELECT key FROM settings WHERE key = ?', [key]);
+    if (!existing) {
+      await run('INSERT INTO settings (key, value) VALUES (?, ?)', [key, value]);
+    }
   }
 }
 

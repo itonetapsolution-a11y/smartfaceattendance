@@ -38,6 +38,7 @@
           <button class="tab-btn active" data-tab="registration">Registration</button>
           <button class="tab-btn" data-tab="dashboard">Dashboard</button>
           <button class="tab-btn" data-tab="reports">Reports</button>
+          <button class="tab-btn" data-tab="settings">Settings</button>
         </div>
         <div style="display:flex; align-items:center; gap:12px;">
           <span id="loggedInAs" class="subtitle" style="margin:0;"></span>
@@ -214,6 +215,33 @@
             </div>
             <p id="dailyEmpty" class="empty" style="display:none;">No data for this range.</p>
           </div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section id="tab-settings" class="tab-panel" style="display:none;">
+        <div class="card" style="max-width: 480px;">
+          <h2>Attendance Geofence</h2>
+          <p class="subtitle" style="margin-bottom: 20px;">
+            Attendance (Mark Attendance and Student Panel) can only be marked within this radius
+            of the location below. Stand at the actual site and click "Use My Current Location"
+            to set it accurately.
+          </p>
+
+          <label for="geoLat">Latitude</label>
+          <input id="geoLat" type="text" placeholder="e.g. 25.133278" />
+
+          <label for="geoLng">Longitude</label>
+          <input id="geoLng" type="text" placeholder="e.g. 75.823042" />
+
+          <label for="geoRadius">Allowed Radius (meters)</label>
+          <input id="geoRadius" type="number" min="1" placeholder="e.g. 200" />
+
+          <button id="useCurrentLocationBtn" class="secondary" type="button" style="width: 100%; margin-bottom: 10px;">
+            Use My Current Location
+          </button>
+          <button id="saveGeofenceBtn" style="width: 100%;">Save Settings</button>
+          <p id="geofenceMsg" style="margin-top: 10px;"></p>
         </div>
       </section>
     </div>

@@ -90,6 +90,8 @@ function setupTabs() {
           loadUsersDropdown();
         }
         generateReport();
+      } else if (tab === 'settings') {
+        loadGeofence();
       }
     });
   });
@@ -505,6 +507,73 @@ dailyDate.value = todayStr();
 toDate.value = todayStr();
 fromDate.value = todayStr();
 updateRangeVisibility();
+
+/* ------------------------------- Settings ------------------------------- */
+
+const geoLat = document.getElementById('geoLat');
+const geoLng = document.getElementById('geoLng');
+const geoRadius = document.getElementById('geoRadius');
+const useCurrentLocationBtn = document.getElementById('useCurrentLocationBtn');
+const saveGeofenceBtn = document.getElementById('saveGeofenceBtn');
+const geofenceMsg = document.getElementById('geofenceMsg');
+
+async function loadGeofence() {
+  const res = await fetch('/api/settings/geofence');
+  const data = await res.json();
+  geoLat.value = data.lat;
+  geoLng.value = data.lng;
+  geoRadius.value = data.radiusMeters;
+}
+
+useCurrentLocationBtn.addEventListener('click', () => {
+  if (!('geolocation' in navigator)) {
+    geofenceMsg.textContent = 'Geolocation is not supported by this browser.';
+    geofenceMsg.style.color = 'var(--bad)';
+    return;
+  }
+  useCurrentLocationBtn.disabled = true;
+  geofenceMsg.textContent = 'Getting your current location...';
+  geofenceMsg.style.color = 'var(--text-dim)';
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      geoLat.value = pos.coords.latitude;
+      geoLng.value = pos.coords.longitude;
+      geofenceMsg.textContent = 'Location filled in. Click Save Settings to apply.';
+      geofenceMsg.style.color = 'var(--good)';
+      useCurrentLocationBtn.disabled = false;
+    },
+    () => {
+      geofenceMsg.textContent = 'Could not get your location. Check location permission.';
+      geofenceMsg.style.color = 'var(--bad)';
+      useCurrentLocationBtn.disabled = false;
+    },
+    { enableHighAccuracy: true, timeout: 15000 }
+  );
+});
+
+saveGeofenceBtn.addEventListener('click', async () => {
+  saveGeofenceBtn.disabled = true;
+  geofenceMsg.textContent = 'Saving...';
+  geofenceMsg.style.color = 'var(--text-dim)';
+
+  const res = await fetch('/api/settings/geofence', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lat: geoLat.value, lng: geoLng.value, radiusMeters: geoRadius.value }),
+  });
+  const data = await res.json();
+
+  if (res.ok) {
+    geofenceMsg.textContent = 'Saved. New location applies immediately.';
+    geofenceMsg.style.color = 'var(--good)';
+  } else {
+    geofenceMsg.textContent = data.error || 'Failed to save.';
+    geofenceMsg.style.color = 'var(--bad)';
+  }
+
+  saveGeofenceBtn.disabled = false;
+});
 
 /* -------------------------------- Start -------------------------------- */
 

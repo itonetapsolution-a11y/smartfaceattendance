@@ -8,6 +8,7 @@ const usersRouter = require('./routes/users');
 const attendanceRouter = require('./routes/attendance');
 const reportsRouter = require('./routes/reports');
 const studentsRouter = require('./routes/students');
+const settingsRouter = require('./routes/settings');
 
 const app = express();
 
@@ -33,5 +34,6 @@ app.use('/api/users', usersRouter);
 app.use('/api/attendance', attendanceRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/students', studentsRouter);
+app.use('/api/settings', settingsRouter);
 
 module.exports = app;
