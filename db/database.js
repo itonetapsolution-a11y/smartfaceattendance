@@ -89,12 +89,16 @@ async function migrate() {
     console.log('Created default admin account -> username: admin, password: admin123');
   }
 
-  const geoDefaults = {
+  const settingDefaults = {
     geofence_lat: '25.133278058574543',
     geofence_lng: '75.82304254920568',
     geofence_radius_m: '200',
+    office_start_time: '09:00',
+    late_after_minutes: '15',
+    half_day_after_time: '13:00',
+    min_full_day_hours: '4',
   };
-  for (const [key, value] of Object.entries(geoDefaults)) {
+  for (const [key, value] of Object.entries(settingDefaults)) {
     const existing = await get('SELECT key FROM settings WHERE key = ?', [key]);
     if (!existing) {
       await run('INSERT INTO settings (key, value) VALUES (?, ?)', [key, value]);

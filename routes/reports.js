@@ -3,6 +3,7 @@ const ExcelJS = require('exceljs');
 const db = require('../db/database');
 const { requireAuth } = require('./auth');
 const { syncReportToSheet } = require('../lib/googleSheets');
+const { getAttendanceRules, computeStatus } = require('../lib/attendanceStatus');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -68,15 +69,18 @@ async function buildReport({ range, from: fromQ, to: toQ, userId }) {
     byUserDate.set(`${row.user_id}_${row.date}`, row);
   }
 
+  const rules = await getAttendanceRules();
   const daily = [];
-  const presentCounts = new Map();
+  const statusCounts = new Map(); // userId -> { Present, Late, 'Half Day' }
 
   for (const date of dates) {
     for (const u of users) {
       const row = byUserDate.get(`${u.id}_${date}`);
-      const status = row ? 'Present' : 'Absent';
-      if (status === 'Present') {
-        presentCounts.set(u.id, (presentCounts.get(u.id) || 0) + 1);
+      const status = computeStatus(row, rules);
+      if (status !== 'Absent') {
+        const counts = statusCounts.get(u.id) || { Present: 0, Late: 0, 'Half Day': 0 };
+        counts[status]++;
+        statusCounts.set(u.id, counts);
       }
       daily.push({
         date,
@@ -92,16 +96,19 @@ async function buildReport({ range, from: fromQ, to: toQ, userId }) {
 
   const totalDays = dates.length;
   const summary = users.map((u) => {
-    const presentDays = presentCounts.get(u.id) || 0;
-    const absentDays = totalDays - presentDays;
+    const counts = statusCounts.get(u.id) || { Present: 0, Late: 0, 'Half Day': 0 };
+    const attendedDays = counts.Present + counts.Late + counts['Half Day'];
+    const absentDays = totalDays - attendedDays;
     return {
       userId: u.id,
       name: u.name,
       employeeId: u.employee_id || '',
       totalDays,
-      presentDays,
+      presentDays: counts.Present,
+      lateDays: counts.Late,
+      halfDays: counts['Half Day'],
       absentDays,
-      attendancePct: totalDays ? Math.round((presentDays / totalDays) * 100) : 0,
+      attendancePct: totalDays ? Math.round((attendedDays / totalDays) * 100) : 0,
     };
   });
 
@@ -125,6 +132,8 @@ router.get('/export', async (req, res) => {
     { header: 'Employee ID', key: 'employeeId', width: 16 },
     { header: 'Total Days', key: 'totalDays', width: 12 },
     { header: 'Present', key: 'presentDays', width: 10 },
+    { header: 'Late', key: 'lateDays', width: 10 },
+    { header: 'Half Day', key: 'halfDays', width: 10 },
     { header: 'Absent', key: 'absentDays', width: 10 },
     { header: 'Attendance %', key: 'attendancePct', width: 14 },
   ];

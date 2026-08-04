@@ -8,6 +8,13 @@ function todayStr() {
   return new Date().toLocaleDateString('en-CA');
 }
 
+function statusBadgeClass(status) {
+  if (status === 'Present') return 'status-good';
+  if (status === 'Late') return 'status-warn';
+  if (status === 'Half Day') return 'status-half';
+  return 'status-bad'; // Absent
+}
+
 /* ---------------------------- Auth / shell ---------------------------- */
 
 const loginSection = document.getElementById('loginSection');
@@ -98,6 +105,7 @@ function activateTab(tab) {
     generateReport();
   } else if (tab === 'settings') {
     loadGeofence();
+    loadAttendanceRules();
   }
 }
 
@@ -389,6 +397,8 @@ captureBtn.addEventListener('click', async () => {
 
 const statTotal = document.getElementById('statTotal');
 const statPresent = document.getElementById('statPresent');
+const statLate = document.getElementById('statLate');
+const statHalfDay = document.getElementById('statHalfDay');
 const statAbsent = document.getElementById('statAbsent');
 const datePicker = document.getElementById('datePicker');
 const todayBtn = document.getElementById('todayBtn');
@@ -407,6 +417,8 @@ async function loadDashboardData() {
 
   statTotal.textContent = stats.totalRegistered;
   statPresent.textContent = stats.presentToday;
+  statLate.textContent = stats.lateToday;
+  statHalfDay.textContent = stats.halfDayToday;
   statAbsent.textContent = stats.absentToday;
 
   logBody.innerHTML = '';
@@ -421,6 +433,7 @@ async function loadDashboardData() {
       <td>${thumb}</td>
       <td>${escapeHtml(row.name)}</td>
       <td>${escapeHtml(row.employee_id || '-')}</td>
+      <td><span class="status-badge ${statusBadgeClass(row.status)}">${row.status}</span></td>
       <td>${row.check_in}</td>
       <td>${row.check_out || '-'}</td>
     `;
@@ -729,6 +742,8 @@ async function generateReport() {
       <td>${escapeHtml(row.name)}</td>
       <td>${escapeHtml(row.employeeId || '-')}</td>
       <td>${row.presentDays}</td>
+      <td>${row.lateDays}</td>
+      <td>${row.halfDays}</td>
       <td>${row.absentDays}</td>
       <td>${row.attendancePct}%</td>
     `;
@@ -739,11 +754,10 @@ async function generateReport() {
   dailyEmpty.style.display = report.daily.length ? 'none' : 'block';
   for (const row of report.daily) {
     const tr = document.createElement('tr');
-    const badgeClass = row.status === 'Present' ? 'status-good' : 'status-bad';
     tr.innerHTML = `
       <td>${row.date}</td>
       <td>${escapeHtml(row.name)}</td>
-      <td><span class="status-badge ${badgeClass}">${row.status}</span></td>
+      <td><span class="status-badge ${statusBadgeClass(row.status)}">${row.status}</span></td>
       <td>${row.checkIn || '-'}</td>
       <td>${row.checkOut || '-'}</td>
     `;
@@ -852,6 +866,50 @@ saveGeofenceBtn.addEventListener('click', async () => {
   }
 
   saveGeofenceBtn.disabled = false;
+});
+
+const ruleStartTime = document.getElementById('ruleStartTime');
+const ruleLateAfter = document.getElementById('ruleLateAfter');
+const ruleHalfDayAfter = document.getElementById('ruleHalfDayAfter');
+const ruleMinHours = document.getElementById('ruleMinHours');
+const saveRulesBtn = document.getElementById('saveRulesBtn');
+const rulesMsg = document.getElementById('rulesMsg');
+
+async function loadAttendanceRules() {
+  const res = await fetch('/api/settings/attendance-rules');
+  const data = await res.json();
+  ruleStartTime.value = data.officeStartTime;
+  ruleLateAfter.value = data.lateAfterMinutes;
+  ruleHalfDayAfter.value = data.halfDayAfterTime;
+  ruleMinHours.value = data.minFullDayHours;
+}
+
+saveRulesBtn.addEventListener('click', async () => {
+  saveRulesBtn.disabled = true;
+  rulesMsg.textContent = 'Saving...';
+  rulesMsg.style.color = 'var(--text-dim)';
+
+  const res = await fetch('/api/settings/attendance-rules', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      officeStartTime: ruleStartTime.value,
+      lateAfterMinutes: ruleLateAfter.value,
+      halfDayAfterTime: ruleHalfDayAfter.value,
+      minFullDayHours: ruleMinHours.value,
+    }),
+  });
+  const data = await res.json();
+
+  if (res.ok) {
+    rulesMsg.textContent = 'Saved. Applies immediately across Dashboard, Reports and exports.';
+    rulesMsg.style.color = 'var(--good)';
+  } else {
+    rulesMsg.textContent = data.error || 'Failed to save.';
+    rulesMsg.style.color = 'var(--bad)';
+  }
+
+  saveRulesBtn.disabled = false;
 });
 
 /* -------------------------------- Start -------------------------------- */

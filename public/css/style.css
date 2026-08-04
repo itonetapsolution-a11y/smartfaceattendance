@@ -367,6 +367,12 @@ tbody tr:hover {
   box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.25);
 }
 
+.status-half {
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--accent-2);
+  box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.25);
+}
+
 #recognitionStatus {
   text-align: center;
   margin-top: 16px;

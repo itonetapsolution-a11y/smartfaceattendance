@@ -4,6 +4,7 @@ const { requireAuth } = require('./auth');
 const { MATCH_THRESHOLD, euclideanDistance } = require('../lib/faceMatch');
 const { todayParts, recordSighting } = require('../lib/attendanceCore');
 const { checkWithinGeofence } = require('../lib/geofence');
+const { getAttendanceRules, computeStatus } = require('../lib/attendanceStatus');
 
 const router = express.Router();
 
@@ -56,7 +57,7 @@ router.post('/mark', async (req, res) => {
   return res.json({ status: result.status, user: userInfo, time: result.time, distance: bestDistance });
 });
 
-// List attendance for a given date (defaults to today)
+// List attendance for a given date (defaults to today), with computed status
 router.get('/', async (req, res) => {
   const date = req.query.date || todayParts().date;
   const rows = await db.all(
@@ -66,16 +67,32 @@ router.get('/', async (req, res) => {
      ORDER BY a.check_in ASC`,
     [date]
   );
-  res.json(rows);
+  const rules = await getAttendanceRules();
+  res.json(rows.map((row) => ({ ...row, status: computeStatus(row, rules) })));
 });
 
-// Quick stats for the dashboard
+// Quick stats for the dashboard: Present / Late / Half Day / Absent breakdown
 router.get('/stats', requireAuth, async (req, res) => {
   const date = req.query.date || todayParts().date;
   const totalRegistered = (await db.get('SELECT COUNT(*) as c FROM users')).c;
-  const presentToday = (await db.get('SELECT COUNT(*) as c FROM attendance WHERE date = ?', [date]))
-    .c;
-  res.json({ date, totalRegistered, presentToday, absentToday: totalRegistered - presentToday });
+  const rows = await db.all('SELECT check_in, check_out FROM attendance WHERE date = ?', [date]);
+  const rules = await getAttendanceRules();
+
+  const counts = { Present: 0, Late: 0, 'Half Day': 0 };
+  for (const row of rows) {
+    const status = computeStatus(row, rules);
+    if (counts[status] !== undefined) counts[status]++;
+  }
+  const attendedToday = rows.length;
+
+  res.json({
+    date,
+    totalRegistered,
+    presentToday: counts.Present,
+    lateToday: counts.Late,
+    halfDayToday: counts['Half Day'],
+    absentToday: totalRegistered - attendedToday,
+  });
 });
 
 // Present/absent count per day for the last N days, for the dashboard chart.

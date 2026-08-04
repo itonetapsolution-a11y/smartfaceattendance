@@ -135,6 +135,14 @@
             <div class="label">Present (selected date)</div>
           </div>
           <div class="card stat">
+            <div class="value" id="statLate" style="color: var(--warn);">-</div>
+            <div class="label">Late (selected date)</div>
+          </div>
+          <div class="card stat">
+            <div class="value" id="statHalfDay" style="color: var(--accent-2);">-</div>
+            <div class="label">Half Day (selected date)</div>
+          </div>
+          <div class="card stat">
             <div class="value" id="statAbsent" style="color: var(--bad);">-</div>
             <div class="label">Absent (selected date)</div>
           </div>
@@ -161,6 +169,7 @@
                 <th></th>
                 <th>Name</th>
                 <th>Employee ID</th>
+                <th>Status</th>
                 <th>Check In</th>
                 <th>Check Out</th>
               </tr>
@@ -221,6 +230,8 @@
                   <th>Name</th>
                   <th>Employee ID</th>
                   <th>Present</th>
+                  <th>Late</th>
+                  <th>Half Day</th>
                   <th>Absent</th>
                   <th>Attendance %</th>
                 </tr>
@@ -253,28 +264,53 @@
 
       <!-- Settings -->
       <section id="tab-settings" class="tab-panel" style="display:none;">
-        <div class="card" style="max-width: 480px;">
-          <h2>Attendance Geofence</h2>
-          <p class="subtitle" style="margin-bottom: 20px;">
-            Attendance (Mark Attendance and Student Panel) can only be marked within this radius
-            of the location below. Stand at the actual site and click "Use My Current Location"
-            to set it accurately.
-          </p>
+        <div class="grid cols-2">
+          <div class="card" style="max-width: 480px;">
+            <h2>Attendance Geofence</h2>
+            <p class="subtitle" style="margin-bottom: 20px;">
+              Attendance (Mark Attendance and Student Panel) can only be marked within this radius
+              of the location below. Stand at the actual site and click "Use My Current Location"
+              to set it accurately.
+            </p>
 
-          <label for="geoLat">Latitude</label>
-          <input id="geoLat" type="text" placeholder="e.g. 25.133278" />
+            <label for="geoLat">Latitude</label>
+            <input id="geoLat" type="text" placeholder="e.g. 25.133278" />
 
-          <label for="geoLng">Longitude</label>
-          <input id="geoLng" type="text" placeholder="e.g. 75.823042" />
+            <label for="geoLng">Longitude</label>
+            <input id="geoLng" type="text" placeholder="e.g. 75.823042" />
 
-          <label for="geoRadius">Allowed Radius (meters)</label>
-          <input id="geoRadius" type="number" min="1" placeholder="e.g. 200" />
+            <label for="geoRadius">Allowed Radius (meters)</label>
+            <input id="geoRadius" type="number" min="1" placeholder="e.g. 200" />
 
-          <button id="useCurrentLocationBtn" class="secondary" type="button" style="width: 100%; margin-bottom: 10px;">
-            Use My Current Location
-          </button>
-          <button id="saveGeofenceBtn" style="width: 100%;">Save Settings</button>
-          <p id="geofenceMsg" style="margin-top: 10px;"></p>
+            <button id="useCurrentLocationBtn" class="secondary" type="button" style="width: 100%; margin-bottom: 10px;">
+              Use My Current Location
+            </button>
+            <button id="saveGeofenceBtn" style="width: 100%;">Save Settings</button>
+            <p id="geofenceMsg" style="margin-top: 10px;"></p>
+          </div>
+
+          <div class="card" style="max-width: 480px;">
+            <h2>Attendance Status Rules</h2>
+            <p class="subtitle" style="margin-bottom: 20px;">
+              Decide what counts as Present, Late, Half Day or Absent. These rules apply
+              automatically everywhere — Dashboard, Reports, Excel/PDF exports.
+            </p>
+
+            <label for="ruleStartTime">Office Start Time</label>
+            <input id="ruleStartTime" type="time" />
+
+            <label for="ruleLateAfter">Mark "Late" if check-in is after start time by (minutes)</label>
+            <input id="ruleLateAfter" type="number" min="0" placeholder="e.g. 15" />
+
+            <label for="ruleHalfDayAfter">Mark "Half Day" if check-in is after</label>
+            <input id="ruleHalfDayAfter" type="time" />
+
+            <label for="ruleMinHours">Minimum hours worked for a Full Day (else Half Day)</label>
+            <input id="ruleMinHours" type="number" min="0" step="0.5" placeholder="e.g. 4" />
+
+            <button id="saveRulesBtn" style="width: 100%;">Save Rules</button>
+            <p id="rulesMsg" style="margin-top: 10px;"></p>
+          </div>
         </div>
       </section>
     </div>
