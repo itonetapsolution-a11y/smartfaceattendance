@@ -73,27 +73,30 @@ logoutBtn.addEventListener('click', async () => {
 let dashboardLoadedOnce = false;
 let reportsLoadedOnce = false;
 
+function activateTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach((p) => {
+    p.style.display = p.id === `tab-${tab}` ? 'block' : 'none';
+  });
+
+  if (tab === 'users') {
+    loadUsers();
+  } else if (tab === 'dashboard') {
+    loadDashboardData();
+  } else if (tab === 'reports') {
+    if (!reportsLoadedOnce) {
+      reportsLoadedOnce = true;
+      loadUsersDropdown();
+    }
+    generateReport();
+  } else if (tab === 'settings') {
+    loadGeofence();
+  }
+}
+
 function setupTabs() {
   document.querySelectorAll('.tab-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const tab = btn.dataset.tab;
-      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b === btn));
-      document.querySelectorAll('.tab-panel').forEach((p) => {
-        p.style.display = p.id === `tab-${tab}` ? 'block' : 'none';
-      });
-
-      if (tab === 'dashboard') {
-        loadDashboardData();
-      } else if (tab === 'reports') {
-        if (!reportsLoadedOnce) {
-          reportsLoadedOnce = true;
-          loadUsersDropdown();
-        }
-        generateReport();
-      } else if (tab === 'settings') {
-        loadGeofence();
-      }
-    });
+    btn.addEventListener('click', () => activateTab(btn.dataset.tab));
   });
 }
 
@@ -248,6 +251,7 @@ function enterEditMode(user) {
   captureMsg.style.color = 'var(--text-dim)';
   step1Msg.textContent = '';
   goToStep(1);
+  activateTab('registration');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -305,6 +309,14 @@ async function loadUsers() {
     });
   });
 }
+
+document.getElementById('usersExportExcelBtn').addEventListener('click', () => {
+  window.location.href = '/api/users/export/excel';
+});
+
+document.getElementById('usersExportPdfBtn').addEventListener('click', () => {
+  window.location.href = '/api/users/export/pdf';
+});
 
 captureBtn.addEventListener('click', async () => {
   const name = nameInput.value.trim();

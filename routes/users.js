@@ -1,4 +1,6 @@
 const express = require('express');
+const ExcelJS = require('exceljs');
+const PDFDocument = require('pdfkit');
 const db = require('../db/database');
 const { requireAuth } = require('./auth');
 
@@ -21,6 +23,94 @@ router.get('/descriptors', async (req, res) => {
     descriptor: JSON.parse(u.descriptor),
   }));
   res.json(parsed);
+});
+
+// Export the registered users list as Excel
+router.get('/export/excel', requireAuth, async (req, res) => {
+  const users = await db.all(
+    'SELECT name, employee_id, phone, created_at FROM users ORDER BY name ASC'
+  );
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Registered Users');
+  sheet.columns = [
+    { header: 'Name', key: 'name', width: 26 },
+    { header: 'Employee ID', key: 'employeeId', width: 16 },
+    { header: 'Mobile', key: 'phone', width: 16 },
+    { header: 'Registered On', key: 'createdAt', width: 20 },
+  ];
+  sheet.addRows(
+    users.map((u) => ({
+      name: u.name,
+      employeeId: u.employee_id || '',
+      phone: u.phone || '',
+      createdAt: u.created_at,
+    }))
+  );
+  sheet.getRow(1).font = { bold: true };
+
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.setHeader('Content-Disposition', 'attachment; filename="registered_users.xlsx"');
+  await workbook.xlsx.write(res);
+  res.end();
+});
+
+// Export the registered users list as PDF
+router.get('/export/pdf', requireAuth, async (req, res) => {
+  const users = await db.all(
+    'SELECT name, employee_id, phone, created_at FROM users ORDER BY name ASC'
+  );
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="registered_users.pdf"');
+
+  const doc = new PDFDocument({ margin: 40, size: 'A4' });
+  doc.pipe(res);
+
+  const columns = [
+    { label: 'Name', width: 170 },
+    { label: 'Employee ID', width: 110 },
+    { label: 'Mobile', width: 110 },
+    { label: 'Registered On', width: 120 },
+  ];
+  const startX = doc.page.margins.left;
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+
+  function drawHeader(y) {
+    doc.font('Helvetica-Bold').fontSize(10);
+    let x = startX;
+    for (const col of columns) {
+      doc.text(col.label, x, y, { width: col.width });
+      x += col.width;
+    }
+    doc.moveTo(startX, y + 16).lineTo(startX + 510, y + 16).stroke();
+    return y + 24;
+  }
+
+  doc.font('Helvetica-Bold').fontSize(16).text('Registered Users', startX, doc.y);
+  doc.moveDown(0.5);
+  let y = drawHeader(doc.y);
+
+  doc.font('Helvetica').fontSize(10);
+  for (const u of users) {
+    if (y > pageBottom - 20) {
+      doc.addPage();
+      y = drawHeader(doc.page.margins.top);
+      doc.font('Helvetica').fontSize(10);
+    }
+    let x = startX;
+    const row = [u.name, u.employee_id || '-', u.phone || '-', u.created_at];
+    row.forEach((val, i) => {
+      doc.text(String(val), x, y, { width: columns[i].width });
+      x += columns[i].width;
+    });
+    y += 20;
+  }
+
+  doc.end();
 });
 
 // Register a new user with a face descriptor
