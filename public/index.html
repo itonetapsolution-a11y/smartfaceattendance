@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'dark');</script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Face Attendance System</title>
@@ -15,6 +16,7 @@
       <a href="/attendance.html">Mark Attendance</a>
       <a href="/student.html">Student Panel</a>
       <a href="/admin.html">Admin</a>
+      <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle theme">☀️</button>
     </div>
   </nav>
   <main>
@@ -42,5 +44,6 @@
       </a>
     </div>
   </main>
+  <script src="/js/theme.js"></script>
 </body>
 </html>

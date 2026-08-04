@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'dark');</script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Student Panel - Face Attendance</title>
@@ -14,6 +15,7 @@
       <a href="/index.html">Home</a>
       <a href="/attendance.html">Mark Attendance</a>
       <a href="/student.html" class="active">Student Panel</a>
+      <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle theme">☀️</button>
     </div>
   </nav>
 
@@ -70,5 +72,6 @@
 
   <script src="/js/face-api.min.js"></script>
   <script src="/js/student.js"></script>
+  <script src="/js/theme.js"></script>
 </body>
 </html>

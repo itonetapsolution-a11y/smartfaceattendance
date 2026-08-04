@@ -83,6 +83,7 @@ async function buildReport({ range, from: fromQ, to: toQ, userId }) {
         statusCounts.set(u.id, counts);
       }
       daily.push({
+        id: row ? row.id : null,
         date,
         userId: u.id,
         name: u.name,

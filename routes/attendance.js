@@ -122,4 +122,64 @@ router.get('/trend', requireAuth, async (req, res) => {
   res.json({ totalRegistered, trend });
 });
 
+function normalizeTime(t) {
+  if (!t) return null;
+  return /^\d{1,2}:\d{2}$/.test(t) ? `${t}:00` : t; // HH:MM -> HH:MM:SS
+}
+
+// Manually create an attendance record for a user/date (e.g. turning an
+// "Absent" day in the report into a corrected entry). Admin-only.
+router.post('/manual', requireAuth, async (req, res) => {
+  const { userId, date, checkIn, checkOut } = req.body;
+
+  if (!userId || !date || !checkIn) {
+    return res.status(400).json({ error: 'userId, date and checkIn are required' });
+  }
+
+  const user = await db.get('SELECT id FROM users WHERE id = ?', [userId]);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  try {
+    await db.run(
+      'INSERT INTO attendance (user_id, date, check_in, check_out) VALUES (?, ?, ?, ?)',
+      [userId, date, normalizeTime(checkIn), normalizeTime(checkOut)]
+    );
+    res.status(201).json({ success: true });
+  } catch (err) {
+    if (db.isUniqueConstraintError(err)) {
+      return res.status(409).json({ error: 'A record already exists for this user on this date' });
+    }
+    res.status(500).json({ error: 'Failed to create record' });
+  }
+});
+
+// Edit an existing attendance record's check-in/check-out. Admin-only.
+router.put('/:id', requireAuth, async (req, res) => {
+  const { checkIn, checkOut } = req.body;
+
+  if (!checkIn) {
+    return res.status(400).json({ error: 'checkIn is required' });
+  }
+
+  const info = await db.run('UPDATE attendance SET check_in = ?, check_out = ? WHERE id = ?', [
+    normalizeTime(checkIn),
+    normalizeTime(checkOut),
+    req.params.id,
+  ]);
+
+  if (info.changes === 0) {
+    return res.status(404).json({ error: 'Record not found' });
+  }
+  res.json({ success: true });
+});
+
+// Delete an attendance record (reverts that user/date back to Absent). Admin-only.
+router.delete('/:id', requireAuth, async (req, res) => {
+  const info = await db.run('DELETE FROM attendance WHERE id = ?', [req.params.id]);
+  if (info.changes === 0) {
+    return res.status(404).json({ error: 'Record not found' });
+  }
+  res.json({ success: true });
+});
+
 module.exports = router;

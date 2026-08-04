@@ -568,7 +568,7 @@ function renderTrendChart(trend) {
     line.setAttribute('x2', width - marginRight);
     line.setAttribute('y1', y);
     line.setAttribute('y2', y);
-    line.setAttribute('stroke', 'rgba(255,255,255,0.08)');
+    line.setAttribute('stroke', 'var(--border)');
     line.setAttribute('stroke-width', '1');
     svg.appendChild(line);
 
@@ -753,15 +753,90 @@ async function generateReport() {
   dailyBody.innerHTML = '';
   dailyEmpty.style.display = report.daily.length ? 'none' : 'block';
   for (const row of report.daily) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${row.date}</td>
-      <td>${escapeHtml(row.name)}</td>
-      <td><span class="status-badge ${statusBadgeClass(row.status)}">${row.status}</span></td>
-      <td>${row.checkIn || '-'}</td>
-      <td>${row.checkOut || '-'}</td>
-    `;
-    dailyBody.appendChild(tr);
+    dailyBody.appendChild(buildDailyRow(row));
+  }
+}
+
+// HH:MM:SS (or empty) -> HH:MM for a <input type="time">
+function toTimeInputValue(t) {
+  return t ? t.slice(0, 5) : '';
+}
+
+function buildDailyRow(row) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${row.date}</td>
+    <td>${escapeHtml(row.name)}</td>
+    <td><span class="status-badge ${statusBadgeClass(row.status)}">${row.status}</span></td>
+    <td class="td-checkin">${row.checkIn || '-'}</td>
+    <td class="td-checkout">${row.checkOut || '-'}</td>
+    <td class="row-actions"><button class="secondary" type="button">Edit</button></td>
+  `;
+  tr.querySelector('button').addEventListener('click', () => enterDailyEditMode(tr, row));
+  return tr;
+}
+
+function enterDailyEditMode(tr, row) {
+  const checkInCell = tr.querySelector('.td-checkin');
+  const checkOutCell = tr.querySelector('.td-checkout');
+  const actionsCell = tr.querySelector('.row-actions');
+
+  checkInCell.innerHTML = `<input type="time" class="edit-checkin" value="${toTimeInputValue(row.checkIn)}" />`;
+  checkOutCell.innerHTML = `<input type="time" class="edit-checkout" value="${toTimeInputValue(row.checkOut)}" />`;
+
+  const deleteBtnHtml = row.id
+    ? `<button class="danger" type="button" data-action="delete">Delete</button>`
+    : '';
+  actionsCell.innerHTML = `
+    <button type="button" data-action="save">Save</button>
+    ${deleteBtnHtml}
+    <button class="secondary" type="button" data-action="cancel">Cancel</button>
+  `;
+
+  actionsCell.querySelector('[data-action="cancel"]').addEventListener('click', () => {
+    dailyBody.replaceChild(buildDailyRow(row), tr);
+  });
+
+  actionsCell.querySelector('[data-action="save"]').addEventListener('click', async () => {
+    const checkIn = tr.querySelector('.edit-checkin').value;
+    const checkOut = tr.querySelector('.edit-checkout').value;
+    if (!checkIn) {
+      alert('Check-in time is required.');
+      return;
+    }
+
+    const url = row.id ? `/api/attendance/${row.id}` : '/api/attendance/manual';
+    const method = row.id ? 'PUT' : 'POST';
+    const body = row.id
+      ? { checkIn, checkOut }
+      : { userId: row.userId, date: row.date, checkIn, checkOut };
+
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok) {
+      generateReport();
+    } else {
+      const data = await res.json();
+      alert(data.error || 'Failed to save.');
+    }
+  });
+
+  const deleteBtn = actionsCell.querySelector('[data-action="delete"]');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm(`Delete this attendance record for ${row.name} on ${row.date}? This reverts it to Absent.`)) return;
+      const res = await fetch(`/api/attendance/${row.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        generateReport();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete.');
+      }
+    });
   }
 }
 
