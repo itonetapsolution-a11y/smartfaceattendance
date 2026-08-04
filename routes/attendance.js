@@ -78,4 +78,31 @@ router.get('/stats', requireAuth, async (req, res) => {
   res.json({ date, totalRegistered, presentToday, absentToday: totalRegistered - presentToday });
 });
 
+// Present/absent count per day for the last N days, for the dashboard chart.
+router.get('/trend', requireAuth, async (req, res) => {
+  const days = Math.min(Math.max(parseInt(req.query.days, 10) || 7, 1), 31);
+  const totalRegistered = (await db.get('SELECT COUNT(*) as c FROM users')).c;
+
+  const dates = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    dates.push(d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
+  }
+
+  const placeholders = dates.map(() => '?').join(',');
+  const rows = await db.all(
+    `SELECT date, COUNT(DISTINCT user_id) as present FROM attendance WHERE date IN (${placeholders}) GROUP BY date`,
+    dates
+  );
+  const presentByDate = Object.fromEntries(rows.map((r) => [r.date, r.present]));
+
+  const trend = dates.map((date) => {
+    const present = presentByDate[date] || 0;
+    return { date, present, absent: Math.max(totalRegistered - present, 0) };
+  });
+
+  res.json({ totalRegistered, trend });
+});
+
 module.exports = router;

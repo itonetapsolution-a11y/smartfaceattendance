@@ -20,6 +20,7 @@ const logoutBtn = document.getElementById('logoutBtn');
 const loggedInAs = document.getElementById('loggedInAs');
 
 let appStarted = false;
+let registrationInitedOnce = false;
 
 async function checkAuth() {
   const res = await fetch('/api/auth/me');
@@ -38,8 +39,8 @@ function showApp(username) {
   loggedInAs.textContent = `Logged in as ${username}`;
   if (!appStarted) {
     appStarted = true;
-    initRegistration();
     setupTabs();
+    activateTab('dashboard');
   }
 }
 
@@ -79,10 +80,16 @@ function activateTab(tab) {
     p.style.display = p.id === `tab-${tab}` ? 'block' : 'none';
   });
 
-  if (tab === 'users') {
+  if (tab === 'registration') {
+    if (!registrationInitedOnce) {
+      registrationInitedOnce = true;
+      initRegistration();
+    }
+  } else if (tab === 'users') {
     loadUsers();
   } else if (tab === 'dashboard') {
     loadDashboardData();
+    loadDashboardTrend();
   } else if (tab === 'reports') {
     if (!reportsLoadedOnce) {
       reportsLoadedOnce = true;
@@ -427,6 +434,234 @@ todayBtn.addEventListener('click', () => {
 });
 datePicker.addEventListener('change', loadDashboardData);
 datePicker.value = todayStr();
+
+/* --------------------------- Dashboard chart --------------------------- */
+// Present/Absent share the app's status colors (green/red). That pair fails
+// the dataviz skill's CVD-separation check at the floor, so the chart never
+// relies on hue alone: Absent always carries a diagonal hatch texture too,
+// and the legend/tooltip spell out the label in text.
+
+const trendChartEl = document.getElementById('trendChart');
+const trendLegendEl = document.getElementById('trendLegend');
+const trendEmptyEl = document.getElementById('trendEmpty');
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+async function loadDashboardTrend() {
+  const res = await fetch('/api/attendance/trend?days=7');
+  const data = await res.json();
+  renderTrendChart(data.trend || []);
+}
+
+function svgRect(x, y, w, h) {
+  const rect = document.createElementNS(SVG_NS, 'rect');
+  rect.setAttribute('x', x);
+  rect.setAttribute('y', y);
+  rect.setAttribute('width', Math.max(w, 0));
+  rect.setAttribute('height', Math.max(h, 0));
+  return rect;
+}
+
+// A rect with the top two corners rounded — used for whichever stacked
+// segment is the outer/terminal one, per the mark spec (baseline stays square).
+function svgRoundedTopRect(x, y, w, h, r) {
+  const path = document.createElementNS(SVG_NS, 'path');
+  if (h <= 0 || w <= 0) {
+    path.setAttribute('d', '');
+    return path;
+  }
+  const rr = Math.min(r, w / 2, h);
+  const d = `M${x},${y + h} L${x},${y + rr} A${rr},${rr} 0 0 1 ${x + rr},${y} ` +
+    `L${x + w - rr},${y} A${rr},${rr} 0 0 1 ${x + w},${y + rr} L${x + w},${y + h} Z`;
+  path.setAttribute('d', d);
+  return path;
+}
+
+function renderTrendChart(trend) {
+  trendChartEl.innerHTML = '';
+  trendLegendEl.innerHTML = '';
+
+  const hasData = trend.some((d) => d.present > 0 || d.absent > 0);
+  trendEmptyEl.style.display = hasData ? 'none' : 'block';
+  if (!hasData || trend.length === 0) return;
+
+  // Legend — text-labeled, and Absent's swatch previews the same hatch used
+  // in the bars so identity never depends on hue alone.
+  const legendSpecs = [
+    { label: 'Present', swatch: 'var(--good)' },
+    {
+      label: 'Absent',
+      swatch:
+        'repeating-linear-gradient(45deg, var(--bad) 0, var(--bad) 2px, rgba(0,0,0,0.35) 2px, rgba(0,0,0,0.35) 4px)',
+    },
+  ];
+  for (const spec of legendSpecs) {
+    const item = document.createElement('span');
+    item.className = 'legend-item';
+    const swatch = document.createElement('span');
+    swatch.className = 'legend-swatch';
+    swatch.style.background = spec.swatch;
+    item.appendChild(swatch);
+    item.appendChild(document.createTextNode(spec.label));
+    trendLegendEl.appendChild(item);
+  }
+
+  const width = 640;
+  const height = 240;
+  const marginLeft = 32;
+  const marginRight = 8;
+  const marginTop = 14;
+  const marginBottom = 26;
+  const plotWidth = width - marginLeft - marginRight;
+  const plotHeight = height - marginTop - marginBottom;
+  const baseline = marginTop + plotHeight;
+
+  const maxTotal = Math.max(...trend.map((d) => d.present + d.absent), 1);
+  const niceMax = Math.ceil(maxTotal / 5) * 5 || 5;
+
+  const slotWidth = plotWidth / trend.length;
+  const barWidth = Math.min(24, slotWidth * 0.5);
+
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', height);
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', 'Present and absent counts for the last 7 days');
+
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  const pattern = document.createElementNS(SVG_NS, 'pattern');
+  pattern.setAttribute('id', 'absentHatch');
+  pattern.setAttribute('width', '6');
+  pattern.setAttribute('height', '6');
+  pattern.setAttribute('patternTransform', 'rotate(45)');
+  pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  const patBg = svgRect(0, 0, 6, 6);
+  patBg.setAttribute('fill', 'var(--bad)');
+  const patStripe = svgRect(0, 0, 2, 6);
+  patStripe.setAttribute('fill', 'rgba(0,0,0,0.35)');
+  pattern.appendChild(patBg);
+  pattern.appendChild(patStripe);
+  defs.appendChild(pattern);
+  svg.appendChild(defs);
+
+  // Gridlines + y-axis ticks (hairline, recessive, rounded values)
+  const steps = 4;
+  for (let s = 0; s <= steps; s++) {
+    const value = Math.round((niceMax / steps) * s);
+    const y = baseline - (value / niceMax) * plotHeight;
+
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', marginLeft);
+    line.setAttribute('x2', width - marginRight);
+    line.setAttribute('y1', y);
+    line.setAttribute('y2', y);
+    line.setAttribute('stroke', 'rgba(255,255,255,0.08)');
+    line.setAttribute('stroke-width', '1');
+    svg.appendChild(line);
+
+    const label = document.createElementNS(SVG_NS, 'text');
+    label.setAttribute('x', marginLeft - 8);
+    label.setAttribute('y', y + 3);
+    label.setAttribute('text-anchor', 'end');
+    label.setAttribute('font-size', '10');
+    label.setAttribute('fill', 'var(--text-dim)');
+    label.textContent = String(value);
+    svg.appendChild(label);
+  }
+
+  const tooltip = document.createElement('div');
+  tooltip.className = 'chart-tooltip';
+  trendChartEl.appendChild(tooltip);
+
+  function showTooltip(evt, d) {
+    const dateLabel = new Date(`${d.date}T00:00:00`).toLocaleDateString('en-IN', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+    tooltip.innerHTML = '';
+    const title = document.createElement('div');
+    title.className = 'tt-title';
+    title.textContent = dateLabel;
+    tooltip.appendChild(title);
+
+    [
+      { label: 'Present', value: d.present, color: 'var(--good)' },
+      { label: 'Absent', value: d.absent, color: 'var(--bad)' },
+    ].forEach((r) => {
+      const row = document.createElement('div');
+      row.className = 'tt-row';
+      const key = document.createElement('span');
+      key.className = 'tt-key';
+      key.style.background = r.color;
+      const strong = document.createElement('strong');
+      strong.textContent = String(r.value);
+      row.appendChild(key);
+      row.appendChild(strong);
+      row.appendChild(document.createTextNode(` ${r.label}`));
+      tooltip.appendChild(row);
+    });
+
+    const containerRect = trendChartEl.getBoundingClientRect();
+    tooltip.style.left = `${evt.clientX - containerRect.left + 12}px`;
+    tooltip.style.top = `${evt.clientY - containerRect.top - 44}px`;
+    tooltip.classList.add('visible');
+  }
+
+  function hideTooltip() {
+    tooltip.classList.remove('visible');
+  }
+
+  trend.forEach((d, i) => {
+    const x = marginLeft + i * slotWidth + (slotWidth - barWidth) / 2;
+    const presentH = (d.present / niceMax) * plotHeight;
+    const absentH = (d.absent / niceMax) * plotHeight;
+    const gap = d.present > 0 && d.absent > 0 ? 2 : 0;
+
+    const group = document.createElementNS(SVG_NS, 'g');
+    group.setAttribute('tabindex', '0');
+    group.style.cursor = 'pointer';
+
+    if (d.present > 0) {
+      const presentTop = baseline - presentH;
+      const el =
+        d.absent === 0
+          ? svgRoundedTopRect(x, presentTop, barWidth, presentH, 4)
+          : svgRect(x, presentTop, barWidth, presentH);
+      el.setAttribute('fill', 'var(--good)');
+      el.classList.add('chart-bar-segment');
+      group.appendChild(el);
+    }
+
+    if (d.absent > 0) {
+      const trimmedH = Math.max(absentH - gap, 0);
+      const absentTop = baseline - presentH - gap - trimmedH;
+      const el = svgRoundedTopRect(x, absentTop, barWidth, trimmedH, 4);
+      el.setAttribute('fill', 'url(#absentHatch)');
+      el.classList.add('chart-bar-segment');
+      group.appendChild(el);
+    }
+
+    group.addEventListener('pointermove', (e) => showTooltip(e, d));
+    group.addEventListener('pointerleave', hideTooltip);
+    group.addEventListener('focus', (e) => showTooltip(e, d));
+    group.addEventListener('blur', hideTooltip);
+
+    svg.appendChild(group);
+
+    const dayLabel = new Date(`${d.date}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short' });
+    const label = document.createElementNS(SVG_NS, 'text');
+    label.setAttribute('x', x + barWidth / 2);
+    label.setAttribute('y', height - 8);
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('font-size', '10');
+    label.setAttribute('fill', 'var(--text-dim)');
+    label.textContent = dayLabel;
+    svg.appendChild(label);
+  });
+
+  trendChartEl.appendChild(svg);
+}
 
 /* ------------------------------- Reports ------------------------------- */
 

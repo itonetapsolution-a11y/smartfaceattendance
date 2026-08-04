@@ -506,3 +506,90 @@ tbody tr:hover {
   margin-bottom: 0;
   width: auto;
 }
+
+/* ------------------------------- Charts -------------------------------- */
+
+.chart-wrap {
+  position: relative;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.chart-wrap svg {
+  display: block;
+  overflow: visible;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.chart-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.chart-legend .legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.chart-bar-segment {
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.chart-bar-segment:hover,
+.chart-bar-segment:focus {
+  opacity: 0.8;
+  outline: none;
+}
+
+.chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--panel-solid);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.1s;
+  z-index: 20;
+}
+
+.chart-tooltip.visible {
+  opacity: 1;
+}
+
+.chart-tooltip .tt-title {
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.chart-tooltip .tt-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-tooltip .tt-row strong {
+  color: var(--text);
+}
+
+.chart-tooltip .tt-key {
+  width: 8px;
+  height: 2px;
+  display: inline-block;
+}
