@@ -767,7 +767,7 @@ function buildDailyRow(row) {
   tr.innerHTML = `
     <td>${row.date}</td>
     <td>${escapeHtml(row.name)}</td>
-    <td><span class="status-badge ${statusBadgeClass(row.status)}">${row.status}</span></td>
+    <td class="td-status"><span class="status-badge ${statusBadgeClass(row.status)}">${row.status}</span></td>
     <td class="td-checkin">${row.checkIn || '-'}</td>
     <td class="td-checkout">${row.checkOut || '-'}</td>
     <td class="row-actions"><button class="secondary" type="button">Edit</button></td>
@@ -776,7 +776,45 @@ function buildDailyRow(row) {
   return tr;
 }
 
-function enterDailyEditMode(tr, row) {
+// Mirrors lib/attendanceStatus.js's computeStatus() so the badge updates live
+// as the admin edits the time, before they even click Save.
+let cachedAttendanceRules = null;
+async function getAttendanceRulesCached() {
+  if (!cachedAttendanceRules) {
+    cachedAttendanceRules = await (await fetch('/api/settings/attendance-rules')).json();
+  }
+  return cachedAttendanceRules;
+}
+
+function timeStrToMinutes(t) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+
+function computeStatusClient(checkIn, checkOut, rules) {
+  if (!checkIn) return 'Absent';
+
+  const checkInMin = timeStrToMinutes(checkIn);
+  const startMin = timeStrToMinutes(rules.officeStartTime);
+  const lateThresholdMin = startMin + rules.lateAfterMinutes;
+  const halfDayThresholdMin = timeStrToMinutes(rules.halfDayAfterTime);
+
+  let status;
+  if (checkInMin > halfDayThresholdMin) status = 'Half Day';
+  else if (checkInMin > lateThresholdMin) status = 'Late';
+  else status = 'Present';
+
+  if (status !== 'Half Day' && checkOut) {
+    const checkOutMin = timeStrToMinutes(checkOut);
+    const workedHours = (checkOutMin - checkInMin) / 60;
+    if (workedHours >= 0 && workedHours < rules.minFullDayHours) status = 'Half Day';
+  }
+
+  return status;
+}
+
+async function enterDailyEditMode(tr, row) {
+  const statusCell = tr.querySelector('.td-status');
   const checkInCell = tr.querySelector('.td-checkin');
   const checkOutCell = tr.querySelector('.td-checkout');
   const actionsCell = tr.querySelector('.row-actions');
@@ -792,6 +830,19 @@ function enterDailyEditMode(tr, row) {
     ${deleteBtnHtml}
     <button class="secondary" type="button" data-action="cancel">Cancel</button>
   `;
+
+  const checkInInput = tr.querySelector('.edit-checkin');
+  const checkOutInput = tr.querySelector('.edit-checkout');
+  const rules = await getAttendanceRulesCached();
+
+  function refreshLiveStatus() {
+    const live = computeStatusClient(checkInInput.value, checkOutInput.value, rules);
+    statusCell.innerHTML = `<span class="status-badge ${statusBadgeClass(live)}">${live}</span>`;
+  }
+
+  checkInInput.addEventListener('input', refreshLiveStatus);
+  checkOutInput.addEventListener('input', refreshLiveStatus);
+  refreshLiveStatus();
 
   actionsCell.querySelector('[data-action="cancel"]').addEventListener('click', () => {
     dailyBody.replaceChild(buildDailyRow(row), tr);
