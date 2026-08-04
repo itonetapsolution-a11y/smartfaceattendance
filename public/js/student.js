@@ -17,6 +17,24 @@ const switchUserBtn = document.getElementById('switchUserBtn');
 const myCheckIn = document.getElementById('myCheckIn');
 const myCheckOut = document.getElementById('myCheckOut');
 
+const myRangeSelect = document.getElementById('myRangeSelect');
+const myFromDate = document.getElementById('myFromDate');
+const myToDate = document.getElementById('myToDate');
+const myGenerateBtn = document.getElementById('myGenerateBtn');
+const myDownloadExcelBtn = document.getElementById('myDownloadExcelBtn');
+const myDownloadPdfBtn = document.getElementById('myDownloadPdfBtn');
+const myRangeLabel = document.getElementById('myRangeLabel');
+const myDailyBody = document.getElementById('myDailyBody');
+const myDailyEmpty = document.getElementById('myDailyEmpty');
+const mySumPresent = document.getElementById('mySumPresent');
+const mySumLate = document.getElementById('mySumLate');
+const mySumHalfDay = document.getElementById('mySumHalfDay');
+const mySumHoliday = document.getElementById('mySumHoliday');
+const mySumPaidLeave = document.getElementById('mySumPaidLeave');
+const mySumOptionalLeave = document.getElementById('mySumOptionalLeave');
+const mySumAbsent = document.getElementById('mySumAbsent');
+const mySumPct = document.getElementById('mySumPct');
+
 const detectorOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
 
 let student = null;
@@ -43,6 +61,26 @@ function startLocationWatch() {
     },
     { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
   );
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function todayStr() {
+  return new Date().toLocaleDateString('en-CA');
+}
+
+function statusBadgeClass(status) {
+  if (status === 'Present') return 'status-good';
+  if (status === 'Late') return 'status-warn';
+  if (status === 'Half Day') return 'status-half';
+  if (status === 'Holiday') return 'status-holiday';
+  if (status === 'Paid Leave') return 'status-paid';
+  if (status === 'Optional Leave') return 'status-optional';
+  return 'status-bad'; // Absent
 }
 
 function speak(text) {
@@ -115,6 +153,88 @@ async function loadTodayStatus() {
   myCheckOut.textContent = row.check_out || '-';
 }
 
+function updateMyRangeVisibility() {
+  const isCustom = myRangeSelect.value === 'custom';
+  myFromDate.style.display = isCustom ? 'inline-block' : 'none';
+  myToDate.style.display = isCustom ? 'inline-block' : 'none';
+}
+
+function buildMyReportQuery() {
+  const range = myRangeSelect.value;
+  const params = new URLSearchParams({ range });
+  if (range === 'custom') {
+    params.set('from', myFromDate.value || todayStr());
+    params.set('to', myToDate.value || todayStr());
+  }
+  return params;
+}
+
+async function loadMyReport() {
+  if (!student) return;
+  const params = buildMyReportQuery();
+  const res = await fetch(`/api/students/report/${student.id}?${params.toString()}`);
+  const report = await res.json();
+  const summary = report.summary[0] || {
+    presentDays: 0,
+    lateDays: 0,
+    halfDays: 0,
+    holidayDays: 0,
+    paidLeaveDays: 0,
+    optionalLeaveDays: 0,
+    absentDays: 0,
+    attendancePct: 0,
+  };
+
+  myRangeLabel.textContent = `Showing ${report.from} to ${report.to}`;
+  mySumPresent.textContent = summary.presentDays;
+  mySumLate.textContent = summary.lateDays;
+  mySumHalfDay.textContent = summary.halfDays;
+  mySumHoliday.textContent = summary.holidayDays;
+  mySumPaidLeave.textContent = summary.paidLeaveDays;
+  mySumOptionalLeave.textContent = summary.optionalLeaveDays;
+  mySumAbsent.textContent = summary.absentDays;
+  mySumPct.textContent = `${summary.attendancePct}%`;
+
+  myDailyBody.innerHTML = '';
+  myDailyEmpty.style.display = report.daily.length ? 'none' : 'block';
+  for (const row of report.daily) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${row.date}</td>
+      <td><span class="status-badge ${statusBadgeClass(row.status)}">${escapeHtml(row.status)}</span></td>
+      <td>${row.checkIn || '-'}</td>
+      <td>${row.checkOut || '-'}</td>
+    `;
+    myDailyBody.appendChild(tr);
+  }
+}
+
+myRangeSelect.addEventListener('change', () => {
+  updateMyRangeVisibility();
+  loadMyReport();
+});
+myFromDate.addEventListener('change', loadMyReport);
+myToDate.addEventListener('change', loadMyReport);
+myGenerateBtn.addEventListener('click', loadMyReport);
+
+myDownloadExcelBtn.addEventListener('click', () => {
+  if (!student) return;
+  const params = buildMyReportQuery();
+  params.set('format', 'xlsx');
+  window.location.href = `/api/students/report/${student.id}/export?${params.toString()}`;
+});
+
+myDownloadPdfBtn.addEventListener('click', () => {
+  if (!student) return;
+  const params = buildMyReportQuery();
+  params.set('format', 'pdf');
+  window.location.href = `/api/students/report/${student.id}/export?${params.toString()}`;
+});
+
+myFromDate.value = todayStr();
+myToDate.value = todayStr();
+updateMyRangeVisibility();
+
 lookupBtn.addEventListener('click', async () => {
   const identifier = identifierInput.value.trim();
   lookupError.textContent = '';
@@ -152,8 +272,15 @@ lookupBtn.addEventListener('click', async () => {
   lookupSection.style.display = 'none';
   panelSection.style.display = 'block';
 
-  await ensureCameraReady();
+  // These don't need the camera, so they load even if it fails to start.
   loadTodayStatus();
+  loadMyReport();
+
+  try {
+    await ensureCameraReady();
+  } catch (err) {
+    setStatus('Camera unavailable. You can still view your attendance below.', 'bad');
+  }
 });
 
 identifierInput.addEventListener('keydown', (e) => {
@@ -197,10 +324,12 @@ markBtn.addEventListener('click', async () => {
     setStatus(`✅ Checked in at ${data.time}.`, 'good');
     speak(`Welcome, ${student.name}. Checked in.`);
     myCheckIn.textContent = data.time;
+    loadMyReport();
   } else if (data.status === 'checked_out') {
     setStatus(`ℹ️ Checked out updated at ${data.time}.`, 'warn');
     speak(`${student.name}, checked out.`);
     myCheckOut.textContent = data.time;
+    loadMyReport();
   } else if (data.status === 'face_mismatch') {
     setStatus('❌ This face does not match this ID. Attendance not marked.', 'bad');
     speak('Face does not match this ID. Attendance not marked.');

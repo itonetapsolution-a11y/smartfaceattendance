@@ -67,6 +67,51 @@
           </div>
         </div>
       </div>
+
+      <div class="card" style="margin-top: 24px;">
+        <div class="toolbar" style="justify-content: space-between;">
+          <h2 style="margin: 0;">My Attendance</h2>
+          <div class="toolbar" style="margin-bottom: 0;">
+            <select id="myRangeSelect">
+              <option value="weekly">Last 7 Days</option>
+              <option value="monthly">This Month</option>
+              <option value="custom">Custom</option>
+            </select>
+            <input type="date" id="myFromDate" style="display:none;" />
+            <input type="date" id="myToDate" style="display:none;" />
+            <button id="myGenerateBtn" class="secondary">Refresh</button>
+            <button id="myDownloadExcelBtn" class="secondary">Download Excel</button>
+            <button id="myDownloadPdfBtn" class="secondary">Download PDF</button>
+          </div>
+        </div>
+        <p id="myRangeLabel" class="subtitle" style="margin: 4px 0 16px;"></p>
+
+        <div class="grid cols-3" style="margin-bottom: 20px;">
+          <div class="card stat"><div class="value" id="mySumPresent" style="color: var(--good);">-</div><div class="label">Present</div></div>
+          <div class="card stat"><div class="value" id="mySumLate" style="color: var(--warn);">-</div><div class="label">Late</div></div>
+          <div class="card stat"><div class="value" id="mySumHalfDay" style="color: var(--accent-2);">-</div><div class="label">Half Day</div></div>
+          <div class="card stat"><div class="value" id="mySumHoliday" style="color: var(--accent-3);">-</div><div class="label">Holiday</div></div>
+          <div class="card stat"><div class="value" id="mySumPaidLeave" style="color: var(--accent);">-</div><div class="label">Paid Leave</div></div>
+          <div class="card stat"><div class="value" id="mySumOptionalLeave" style="color: #a78bfa;">-</div><div class="label">Optional Leave</div></div>
+          <div class="card stat"><div class="value" id="mySumAbsent" style="color: var(--bad);">-</div><div class="label">Absent</div></div>
+          <div class="card stat"><div class="value" id="mySumPct" style="color: var(--text);">-</div><div class="label">Attendance %</div></div>
+        </div>
+
+        <div style="max-height: 420px; overflow-y: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Check In</th>
+                <th>Check Out</th>
+              </tr>
+            </thead>
+            <tbody id="myDailyBody"></tbody>
+          </table>
+        </div>
+        <p id="myDailyEmpty" class="empty" style="display:none;">No records for this range.</p>
+      </div>
     </div>
   </main>
 
