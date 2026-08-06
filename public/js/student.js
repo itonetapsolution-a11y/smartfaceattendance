@@ -97,6 +97,18 @@ function setStatus(text, type) {
     type === 'good' ? 'var(--good)' : type === 'bad' ? 'var(--bad)' : type === 'warn' ? 'var(--warn)' : 'var(--text-dim)';
 }
 
+// Show a result message, then clear it back to the ready state after a few
+// seconds instead of leaving it on screen forever.
+let statusHoldTimer = null;
+const STATUS_HOLD_MS = 4000;
+function holdStatus(text, type) {
+  setStatus(text, type);
+  clearTimeout(statusHoldTimer);
+  statusHoldTimer = setTimeout(() => {
+    setStatus('Ready. Position your face and click "Mark My Attendance".', 'dim');
+  }, STATUS_HOLD_MS);
+}
+
 async function loadModels() {
   await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
   await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
@@ -333,23 +345,23 @@ markBtn.addEventListener('click', async () => {
   const data = await res.json();
 
   if (data.status === 'checked_in') {
-    setStatus(`✅ Checked in at ${data.time}.`, 'good');
+    holdStatus(`✅ Checked in at ${data.time}.`, 'good');
     speak(`Welcome, ${student.name}. Checked in.`);
     myCheckIn.textContent = data.time;
     loadMyReport();
   } else if (data.status === 'checked_out') {
-    setStatus(`ℹ️ Checked out updated at ${data.time}.`, 'warn');
+    holdStatus(`ℹ️ Checked out updated at ${data.time}.`, 'warn');
     speak(`${student.name}, checked out.`);
     myCheckOut.textContent = data.time;
     loadMyReport();
   } else if (data.status === 'face_mismatch') {
-    setStatus('❌ This face does not match this ID. Attendance not marked.', 'bad');
+    holdStatus('❌ This face does not match this ID. Attendance not marked.', 'bad');
     speak('Face does not match this ID. Attendance not marked.');
   } else if (data.status === 'outside_geofence') {
-    setStatus(`❌ You are ${data.distance}m away from the allowed location. Move closer to mark attendance.`, 'bad');
+    holdStatus(`❌ You are ${data.distance}m away from the allowed location. Move closer to mark attendance.`, 'bad');
     speak('You are too far from the location. Attendance not marked.');
   } else {
-    setStatus(data.error || 'Something went wrong.', 'bad');
+    holdStatus(data.error || 'Something went wrong.', 'bad');
   }
 
   markBtn.disabled = false;

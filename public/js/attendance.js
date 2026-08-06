@@ -10,6 +10,19 @@ let faceMatcher = null;
 let lastMarkAttempt = 0;
 const MARK_COOLDOWN_MS = 2500;
 
+// After a check-in/check-out/rejection message is shown, hold it on screen for
+// a bit instead of letting the next detection tick immediately overwrite it —
+// otherwise it can flicker away before anyone reads it.
+let statusHoldUntil = 0;
+const STATUS_HOLD_MS = 4000;
+function withinStatusHold() {
+  return Date.now() < statusHoldUntil;
+}
+function holdStatus(text, type) {
+  setStatus(text, type);
+  statusHoldUntil = Date.now() + STATUS_HOLD_MS;
+}
+
 // Attendance can only be marked near the configured location (see Admin ->
 // Settings). watchPosition keeps this fresh instead of a one-off read.
 let currentPosition = null;
@@ -172,7 +185,7 @@ async function detectLoop() {
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
     if (!detection) {
-      setStatus('No face detected.', 'dim');
+      if (!withinStatusHold()) setStatus('No face detected.', 'dim');
       return;
     }
 
@@ -186,19 +199,19 @@ async function detectLoop() {
     }
 
     if (label === 'unknown') {
-      setStatus('Face not recognized — not a registered user.', 'bad');
+      if (!withinStatusHold()) setStatus('Face not recognized — not a registered user.', 'bad');
       return;
     }
 
     if (!currentPosition) {
-      setStatus(locationError || 'Getting your location...', 'warn');
+      if (!withinStatusHold()) setStatus(locationError || 'Getting your location...', 'warn');
       return;
     }
 
-    setStatus('Face recognized. Verifying attendance...', 'dim');
+    if (!withinStatusHold()) setStatus('Face recognized. Verifying attendance...', 'dim');
 
     const now = Date.now();
-    if (now - lastMarkAttempt < MARK_COOLDOWN_MS) return;
+    if (now - lastMarkAttempt < MARK_COOLDOWN_MS || withinStatusHold()) return;
     lastMarkAttempt = now;
 
     const res = await fetch('/api/attendance/mark', {
@@ -213,18 +226,18 @@ async function detectLoop() {
     const data = await res.json();
 
     if (data.status === 'checked_in') {
-      setStatus(`✅ Welcome, ${data.user.name}! Checked in at ${data.time}.`, 'good');
+      holdStatus(`✅ Welcome, ${data.user.name}! Checked in at ${data.time}.`, 'good');
       setCheckIn(data.user.id, data.user.name, data.user.photo, data.time);
       speakForLabel(label, `Welcome, ${data.user.name}. Checked in.`);
     } else if (data.status === 'checked_out') {
-      setStatus(`ℹ️ ${data.user.name}, checked out updated at ${data.time}.`, 'warn');
+      holdStatus(`ℹ️ ${data.user.name}, checked out updated at ${data.time}.`, 'warn');
       setCheckOut(data.user.id, data.user.name, data.user.photo, 'earlier today', data.time);
       speakForLabel(label, `${data.user.name}, checked out.`);
     } else if (data.status === 'outside_geofence') {
-      setStatus(`❌ You are ${data.distance}m away from the allowed location. Move closer to mark attendance.`, 'bad');
+      holdStatus(`❌ You are ${data.distance}m away from the allowed location. Move closer to mark attendance.`, 'bad');
       speakForLabel(label, 'You are too far from the location. Attendance not marked.');
     } else {
-      setStatus('Face not recognized — not a registered user.', 'bad');
+      if (!withinStatusHold()) setStatus('Face not recognized — not a registered user.', 'bad');
     }
   }, 700);
 }
